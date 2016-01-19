@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.w3.org/2005/Atom" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:atom="http://www.w3.org/2005/Atom">
+  <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices" schemaLocation="d.xsd"/>
+  <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" schemaLocation="m.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
+  <xs:element name="entry">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:choice minOccurs="0" maxOccurs="unbounded">
+          <xs:element ref="atom:id"/>
+          <xs:element ref="atom:link"/>
+          <xs:element ref="atom:title"/>
+          <xs:element ref="atom:updated"/>
+          <xs:element ref="atom:category"/>
+        </xs:choice>
+        <xs:element ref="atom:content"/>
+      </xs:sequence>
+      <xs:attribute ref="xml:base"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="category">
+    <xs:complexType>
+      <xs:attribute name="scheme" use="required" type="xs:anyURI"/>
+      <xs:attribute name="term" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="content">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="m:properties"/>
+      </xs:sequence>
+      <xs:attribute name="type" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="id" type="xs:anyURI"/>
+  <xs:element name="title">
+    <xs:complexType mixed="true">
+      <xs:attribute name="type" use="required" type="xs:NCName"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="updated" type="xs:dateTime"/>
+  <xs:element name="link">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" ref="m:inline"/>
+      </xs:sequence>
+      <xs:attribute name="href" use="required"/>
+      <xs:attribute name="rel" use="required" type="xs:anyURI"/>
+      <xs:attribute name="title" use="required" type="xs:NCName"/>
+      <xs:attribute name="type"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="feed">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="atom:id"/>
+        <xs:element ref="atom:title"/>
+        <xs:element ref="atom:updated"/>
+        <xs:element ref="atom:author"/>
+        <xs:element ref="atom:link"/>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="atom:entry"/>
+      </xs:sequence>
+      <xs:attribute ref="xml:base" use="required"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="author">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="atom:name"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="name">
+    <xs:complexType/>
+  </xs:element>
+</xs:schema>

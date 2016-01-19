@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/ado/2007/08/dataservices" 
+	xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices"
+	xmlns:atom="http://www.w3.org/2005/Atom">
+  <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" schemaLocation="m.xsd"/>
+  <xs:import namespace="http://www.w3.org/2005/Atom" schemaLocation="entry.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
+  <xs:element name="SapNotesNumber" type="xs:string"/>
+  <xs:element name="SapNotesKey" type="xs:string"/>
+  <xs:element name="Title" type="xs:string"/>
+  <xs:element name="Type" type="xs:string"/>
+  <xs:element name="Category" type="xs:string"/>
+	<xs:element name="ComponentKey" type="xs:string"/>
+  <xs:element name="ComponentText" type="xs:string"/>
+  <xs:element name="Language" type="xs:string"/>
+  <xs:element name="Priority" type="xs:string"/>
+  <xs:element name="ReleasedOn" type="xs:string"/>
+	<xs:element name="Version" type="xs:string"/>
+	<xs:element name="CurrentLang" type="xs:string"/>
+	<xs:element name="Lang" type="xs:string"/>
+	<xs:element name="LangMaster" type="xs:string"/>
+	<xs:element name="LangText" type="xs:string"/>
+	<xs:element name="TypeKey" type="xs:string"/>
+  <xs:element name="TypeText" type="xs:string"/>
+  <xs:element name="Text" type="xs:string"/>
+	<xs:element name="RefNum" type="xs:string"/>
+  <xs:element name="RefType" type="xs:string"/>
+  <xs:element name="RefTitle" type="xs:string"/>
+  <xs:element name="RefUrl" type="xs:string"/>
+  <xs:element name="RefKey" type="xs:string"/>
+	<xs:element name="LanguageText" type="xs:string"/>
+	<xs:element name="Favorite" type="xs:string"/>
+</xs:schema>

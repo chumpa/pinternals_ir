@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:m="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:d="http://schemas.microsoft.com/ado/2007/08/dataservices" xmlns:atom="http://www.w3.org/2005/Atom">
+  <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices" schemaLocation="d.xsd"/>
+  <xs:import namespace="http://www.w3.org/2005/Atom" schemaLocation="entry.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
+  <xs:element name="properties">
+    <xs:complexType>
+    	<xs:all>
+    		<xs:element ref="d:SapNotesNumber"/>
+    		<xs:element ref="d:SapNotesKey"/>
+    		<xs:element ref="d:Title"/>
+    		<xs:element ref="d:Type"/>
+    		<xs:element ref="d:Category"/>
+    		<xs:element ref="d:ComponentKey"/>
+    		<xs:element ref="d:ComponentText"/>
+    		<xs:element ref="d:Language"/>
+    		<xs:element ref="d:Priority"/>
+    		<xs:element ref="d:ReleasedOn"/>
+    		<xs:element ref="d:Version"/>
+    		<xs:element ref="d:CurrentLang"/>
+    		<xs:element ref="d:Lang"/>
+    		<xs:element ref="d:LangMaster"/>
+    		<xs:element ref="d:LangText"/>
+    		<xs:element ref="d:TypeKey"/>
+    		<xs:element ref="d:TypeText"/>
+    		<xs:element ref="d:Text"/>
+    		<xs:element ref="d:RefNum"/>
+    		<xs:element ref="d:RefType"/>
+    		<xs:element ref="d:RefTitle"/>
+    		<xs:element ref="d:RefUrl"/>
+    		<xs:element ref="d:RefKey"/>
+    		<xs:element ref="d:LanguageText"/>
+    		<xs:element ref="d:Favorite"/> 		
+    	</xs:all>
+      <!--xs:sequence>
+        <xs:element ref="d:SapNotesNumber"/>
+        <xs:sequence minOccurs="0">
+          <xs:element ref="d:SapNotesKey"/>
+          <xs:element ref="d:Title"/>
+          <xs:element ref="d:Type"/>
+        </xs:sequence>
+        <xs:choice maxOccurs="unbounded">
+          <xs:element ref="d:Category"/>
+          <xs:element ref="d:ComponentKey"/>
+          <xs:element ref="d:ComponentText"/>
+          <xs:element ref="d:Language"/>
+          <xs:element ref="d:Priority"/>
+          <xs:element ref="d:ReleasedOn"/>
+          <xs:element ref="d:Version"/>
+        </xs:choice>
+        <xs:choice>
+          <xs:sequence>
+            <xs:element ref="d:CurrentLang"/>
+            <xs:element ref="d:Lang"/>
+            <xs:element ref="d:LangMaster"/>
+            <xs:element ref="d:LangText"/>
+          </xs:sequence>
+          <xs:sequence>
+            <xs:element ref="d:TypeKey"/>
+            <xs:element ref="d:TypeText"/>
+            <xs:element ref="d:Text"/>
+          </xs:sequence>
+          <xs:sequence>
+            <xs:element ref="d:RefNum"/>
+            <xs:element ref="d:RefType"/>
+            <xs:element ref="d:RefTitle"/>
+            <xs:element ref="d:RefUrl"/>
+            <xs:element ref="d:RefKey"/>
+          </xs:sequence>
+          <xs:sequence>
+            <xs:element ref="d:LanguageText"/>
+            <xs:element ref="d:Favorite"/>
+          </xs:sequence>
+        </xs:choice>
+      </xs:sequence-->
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="inline">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="atom:feed"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
