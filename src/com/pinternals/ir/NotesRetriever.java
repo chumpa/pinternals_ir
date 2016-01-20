@@ -6,15 +6,11 @@ import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Properties;
 import java.util.logging.Logger;
 
 import org.apache.commons.cli.CommandLine;
@@ -25,7 +21,6 @@ import org.apache.commons.cli.Option;
 import org.apache.commons.cli.Options;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.Credentials;
-
 
 // az
 class AZ{
@@ -63,82 +58,6 @@ class AZ{
 		Version v = new Version(ver, releasedon);
 		vers.add(v);
 	}
-	static SimpleDateFormat xmld = new SimpleDateFormat("yyyy-MM-dd");
-	boolean need() throws ParseException {
-		boolean b = true;
-		int i = 0;
-		Date gd = xmld.parse(dateS), vd;
-//		System.out.println("Date:" + date);
-		for (Version v: vers) {
-			String r = v.releasedon.substring(0, 10);
-			vd = xmld.parse(r);
-			i = vd.compareTo(gd);
-			if (i==0) b = false;
-//			System.out.println("releasedon:" + v.releasedon + "|" + vd.compareTo(gd));
-		}
-		return b;
-	}
-	Properties a = new Properties();
-	void putProperty(String n, String v) {
-//		<d:>0000565196</d:SapNotesNumber>
-//		<d:>012006153200001835992002</d:SapNotesKey>
-//		<d:Title>XI: Zusätzliche Mappingtypen für Partner-Mappings</d:Title>
-//		<d:Type>SAP Note</d:Type>
-//		<d:Version>1</d:Version>
-//		<d:Priority>Korrektur mit hoher Priorität</d:Priority>
-//		<d:Category>Programmfehler</d:Category>
-//		<d:ReleasedOn>2002-10-23T11:04:22</d:ReleasedOn>
-//		<d:ComponentKey>BC-XI-IBC-MAP</d:ComponentKey>
-//		<d:ComponentText>Mapping</d:ComponentText>
-//		<d:Language>D</d:>
-//		<d:LanguageText>
-//		<d:Favorite>
-		switch (n) {
-		case "SapNotesNumber":
-			if (Integer.valueOf(v)!=num) throw new RuntimeException("Number mismatch");
-			break;
-		case "SapNotesKey":
-			objid2 = new String(v);
-			break;
-		case "Title":
-			title = new String(v);
-			break;
-		case "Type":
-			type = new String(v);
-			break;
-		case "Priority":
-			priority = new String(v);
-			break;
-		case "Category":
-			category = new String(v);
-			break;
-		case "ComponentKey":
-			if (!v.equals(area)) throw new RuntimeException("Area mismatch");
-			break;
-		case "ComponentText":
-			areadescr = new String(v);
-			break;
-		case "Language":
-			if (!v.equals(lang)) badLang = true;
-			break;
-		case "Version":
-			newVers = new String(v); 
-			break;
-		case "ReleasedOn":
-			newReleasedOn = new String(v);
-			break;
-		}
-	}
-}
-
-enum EScheme {
-	CompareVersions, NotePrintVersion, NoteLastFancyVersion, NoteListForm, NoteStatistic,
-	NoteWUL, NoteAttachment, NoteChangeLog, InternalMemo, SSCR, Pilot,
-	CWB, Nit, DPA, PutDownloadBasket, NoteList,
-	
-	//util
-	ZVersions, ZRoot, UserProfile
-	;
 }
 
 
@@ -237,12 +156,14 @@ public class NotesRetriever {
 			formatter.printHelp("java [-ea] -jar pinternals_ir.jar [options] [command]", 
 					"Options are:\n-ea   for enable asserts", opts, 
 					"\nCommands are:\n" 
-					+ "STOREPASSWD                    make <uname>.pwd file with stored password\n"
-					+ "INITDB                         init database\n"
-					+ "GETLIST [dtfrom [dtto]]        ask SCN, make notes_yyyyMMyy--yyyyMMyy_[D,E].zip\n"
-					+ "PARSELIST                      notes_yyyyMMyy--yyyyMMyy_[D,E].zip into xml\n"
-					+ "TESTRAW <raw-dir>              test raw lists\n"
-					+ "CACHE                          handle cache\n"
+					+ "STOREPASSWD                  make <uname>.pwd file with stored password\n"
+					+ "INITDB                       create empty database\n"
+					+ "SUPP.GETNOTES [dtfrom dtto]  request for support.sap.com/notes and store notes*zip\n"
+					+ "SUPP.GETNOTES.CMD            close to GETSUPNOTES but makes script\n"
+					+ "SUPP.CACHE                   cache support-sap-com-notes/notes*zip into db\n"
+					+ "LPAD.AREAS                   ask launchpad for unknown application areas\n"
+					+ "LPAD                       \n"
+					+ "LPAD.2                      \n"
 					);
 			return;
 		} else {
@@ -271,7 +192,6 @@ public class NotesRetriever {
 				return;
 			}
 			Cache cache = new Cache(cmd.getOptionValue('c'));
-//			NotesRetriever nr = new NotesRetriever();
 
 			HttpHost prHost = null;
 			Credentials prCred = null;
@@ -282,8 +202,8 @@ public class NotesRetriever {
 
 			DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
 			LocalDate b = LocalDate.parse("19900101", dtf), t, tm = LocalDate.now();
-			Iterator<Path> it = cache.a();
-			if (cm.equals("GETLISTCMD")) {
+			Iterator<Path> it = cache.getSupportSapComNotesZip();
+			if (cm.equals("SUPP.GETNOTES.CMD")) {
 				while (it.hasNext()) {
 					Path q = it.next();
 					LocalDate from =  LocalDate.parse(q.getFileName().toString().substring(6,14), dtf);
@@ -300,6 +220,7 @@ public class NotesRetriever {
 					System.out.println(String.format("call test.bat GETLIST %s %s", dtf.format(b), dtf.format(t)));
 					b = t;
 				}
+				return;
 			}
 			if (!cmd.hasOption('u')) {
 				System.err.println("Error: user is not given. Use '-u uname'");
@@ -307,7 +228,7 @@ public class NotesRetriever {
 			} 
 			String uname = cmd.getOptionValue('u');
 			NotesDB db = new NotesDB(cache.notesdb, true);
-			if (cm.equals("GETLIST")) {
+			if (cm.equals("SUPP.GETNOTES")) {
 				System.out.println("NotesRetriever for " + uname);
 				String dtfrom = null, dtto = null;
 				if (as>2) {
@@ -316,213 +237,25 @@ public class NotesRetriever {
 				}
 				Support sup = new Support(Utils.makeHttpClient(uname, prHost, prCred));
 				sup.zZz(cache, dtfrom, dtto);
-				Support.cache(cache, db);	
-			} else if (cm.equals("CACHE")) {
 				Support.cache(cache, db);
-			} else if (cm.equals("Z2")) {
-				Launchpad l = new Launchpad(cache.launchpad);
-				l.z2(cache, db);
-//				WebClient wc = Launchpad.getLaunchpad(uname, prHost, prCred);
-			} else if (cm.equals("Z3")) {
-				Launchpad l = new Launchpad(cache.launchpad);
-				l.z2(cache, db);
-				l.z3(cache, db, uname, prHost, prCred);
+				return;
+			} else if (cm.equals("SUPP.CACHE")) {
+				Support.cache(cache, db);
+				return;
+			} 
+			Launchpad l = new Launchpad(cache, uname, prHost, prCred);
+			if (cm.equals("LPAD.AREAS")) {
+				for (String p: args.subList(1, as)) l.a2(db, p);
+			} else if (cm.equals("LPAD")) {
+				l.z2(db);
+			} else if (cm.equals("LPAD2")) {
+				l.z2(db);
+				l.z3(db);
+			} else {
+				System.err.println(String.format("Unknown command: %s\nTry -h for help", cm));
 			}
-
-			
-			//			if (cm.equals("TESTRAW")) {
-//				if (as==1) {
-//					System.err.println("Path is required");
-//					System.exit(-1);
-//				}
-//				Path qq = FileSystems.getDefault().getPath(args.get(1));
-//				System.out.println("qq="+qq);
-//				for (Pair<Character,Path> x: Cache.filterRawFiles(qq)) {
-//					ParseIndexContext ctx = new ParseIndexContext(sdSUser, x.getKey());
-//					Path raw = x.getValue();
-//					nr.parseIndex(raw.toFile(), ctx);
-//					String t = raw.getFileName().toString();
-//					if (ctx.errors>0) {
-//						System.err.println("Archive " + t + " has errors: " + ctx.errors);
-//						for (String z: ctx.lerrors) System.err.println(z);
-////						x.getValue().renameTo(new File(x.getValue().getAbsolutePath() + ".errors"));
-//					} else {
-//						System.out.println("Archive " + t + " OK (" + ctx.list.size() + " notes)");
-//					}
-//				}
-//			} 
-
-//			if (cm.equals("CACHE")) {
-//				for (Pair<Character,Path> x: cache.getRawFiles(true)) {
-//					ParseIndexContext ctx = new ParseIndexContext(zip);// sdSUser, x.getKey());
-//					Path raw = x.getValue();
-//					Path xml = cache.getPathXml(raw);
-//					System.out.println(raw + "\t-> " + xml);
-//					Support.parseIndex(raw.toFile(), ctx);
-//					cache.storeXml(ctx, xml);
-//				}
-//				// читаем файлы по порядку и строим отчёт
-//				DirectoryStream<Path> xmls = Files.newDirectoryStream(cache.xmldir, "notes_*--*.xml");
-//				db.walk(xmls.iterator(), false, cache.newnotes);
-//				return;
-//			}
-
-//			if (cm.equals("GETAREA")) {
-//				assert as>1;
-//				WebClient wc = null;
-//				for (String area: args.subList(1, as)) {
-//					System.out.print(area); 
-//					List<AZ> q = cache.getZ2(area);
-//					System.out.print("\t" + q.size());
-//					List<AZ> r = db.getZ2(q, area);
-//					System.out.print("\t" + r + "\n");
-//					if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
-//					NotesRetriever.getZ2(cache, db, wc, r);
-//				}
-//				if (wc!=null) wc.close();
-//			} else  {
-//				System.err.println("unknown command: " + cm);
-//				System.exit(-1);
-//			}
+			if (l!=null) l.close();
 		}
 	}
 	
-//	static List<Path> getZ2(Cache cache, NotesDB db, WebClient wc, List<AZ> r) throws FailingHttpStatusCodeException, IOException, SQLException {
-//		List<Path> x = new ArrayList<Path>(r.size());
-//		for (AZ az: r) {
-//	    	URL u = Launchpad.getByScheme(az.lang, az.num, 0);
-//	    	XmlPage xm = wc.getPage(u);
-//
-//	    	String s = String.format("%010d_root_%s.xml", az.num, az.lang);
-//	    	Path q = Cache.fs.getPath(cache.newdir.toString(), s);
-//	    	BufferedWriter pw = Files.newBufferedWriter(q);
-//	    	pw.write(xm.getWebResponse().getContentAsString());
-//	    	pw.close();
-//	    	
-//	    	assert xm instanceof XmlPage;
-//	    	NodeList o = xm.getChildNodes();
-//	    	Node n = o.item(0);
-//	    	assert n.getLocalName().equals("entry");
-//	    	o = n.getChildNodes();
-//	    	n = null;
-//	    	if (o!=null) for (int i=0; i<o.getLength(); i++) {
-//	    		n = o.item(i);
-//	    		if (n.getNodeType()==Node.ELEMENT_NODE && n.getLocalName().equals("content")) break;
-//	    	}
-//	    	assert n!=null;
-//	    	o = n.getChildNodes();
-//	    	assert o!=null && o.getLength()==1;
-//	    	n = o.item(0);
-//	    	assert n.getLocalName().equals("properties");
-//	    	o = n.getChildNodes();
-//	    	if (o!=null) for (int i=0; i<o.getLength(); i++) {
-//	    		n = o.item(i);
-//	    		assert n.getNodeType()==Node.ELEMENT_NODE;
-//	    		az.putProperty(n.getLocalName(), n.getTextContent());
-//	    	}
-//	    	if (az.badLang) {
-//	    		System.err.println("Bad language:" + az.num + az.lang);
-//	    		db.setMissedTitle(az.num, az.lang);
-//	    	} else {
-//	    		db.updateVer(az);
-//	    	}
-////	    	break;
-//		}
-//		return x;
-//	}
 }
-
-//List<Integer> unknown = db.getUnknownObjid("%", 10000);
-//List<String> objs = new ArrayList<String>(unknown.size());
-//if (unknown.size()>0) {
-//	for (int number: unknown) {
-//		String x = nr.getObjid(null, null, cache, number, false);
-//		objs.add(x);
-//		if (x!=null) System.out.print(number + ",");
-//	}
-//	int q = db.updateObjid(unknown, objs);
-//	System.out.println("Commited new objid: " + q);
-//}
-//// смотрим, версии каких нот читались последними
-//List<Pair<Integer, Path>> vers = cache.getRawVers(true);
-//for (Pair<Integer, Path> p: vers) {
-//	System.out.println(p.getKey().toString());
-//	db.updateVer(p.getKey(), p.getValue());
-//}
-//if (vers.size()>0) Files.move(cache.dirtyver, cache.dirtybak); 
-//} else if (cm.equals("SW")) {
-//if (!cmd.hasOption('c')) {
-//	System.err.println("Path to cache is required");
-//	System.exit(-1);
-//}
-//String t = as>1 ? args.get(1) : "%";
-//PrintWriter pw = new PrintWriter(Files.newOutputStream(cache.dirtyver));
-//db.skywalk(t, pw);
-//pw.close();
-//} else if (cm.equals("NV")) {
-//// notes-version
-//if (!cmd.hasOption('c')) {
-//	System.err.println("Path to cache is required");
-//	System.exit(-1);
-//}
-//nr.aa(cmd);
-//CloseableHttpClient cl = Utils.makeHttpClient(nr.uname, prHost, prCred);
-//System.out.println("NotesRetriever for " + nr.uname);
-//HttpClientContext htx = nr.probeUrl(cl, "https://service.sap.com", "");
-//Path y = as<2 ? cache.dirtyver : Cache.fs.getPath(args.get(1));
-//Scanner a = new Scanner(y);
-//while (a.hasNextLine()) {
-//	String z = a.nextLine();
-//	System.out.println(z);
-//	String x[] = z.split("\t");
-//	int number = Integer.valueOf(x[0]);
-//	String objid = new String(x[1]);
-//	nr.notever(cl, htx, cache, number, objid, true, true);
-//}
-//a.close();
-//} else if (cm.equals("OBJID")) {
-//// notes-version
-//if (!cmd.hasOption('c')) {
-//	System.err.println("Path to cache is required");
-//	System.exit(-1);
-//}
-//nr.aa(cmd);
-//List<Integer> unknown = db.getUnknownObjid("%", 3);
-//db.close();
-//unknown.sort(Comparator.comparing(x -> x % (Math.rint(10))));
-//
-//List<String> objs = new ArrayList<String>(unknown.size());
-////System.out.println(unknown);
-//if (unknown.size()>0) {
-//	CloseableHttpClient cl = Utils.makeHttpClient(nr.uname, prHost, prCred);
-//	System.out.println("NotesRetriever for " + nr.uname);
-//	HttpClientContext htx = nr.probeUrl(cl, "https://service.sap.com", "");
-//	for (int number: unknown) {
-//		String x = nr.getObjid(cl, htx, cache, number, true);
-//		objs.add(x);
-//		if (x!=null) System.out.print(number + ",");
-//	}
-//	System.out.println("Commited: " + objs.size());
-//}
-//} else if (cm.equals("REP")) {
-//db.report(args.get(1));
-//db.close();
-////db.skywalk2(args.get(1)+"%", new PrintWriter(System.out));
-//
-
-
-/*
-https://websmp230.sap-ag.de/~form/handler?_APP=01100107900000000342&_EVENT=REDIR&_NNUM=2048282&_NLANG=
-
-[0]	 	[1]	 	[2]	Application Area	[3]	Number	[4]	Short text	[5]	Released On	[6]	Category	[7]	Priority	
-[0]	 	[1]	1.	[2]	BC-JAS	[3]	1906728 *	[4]	How to customize favicon.ico image for SAP NetWeaver 7.0X version	[5]	09.09.2014	[6]	How To	[7]	Normal	
-[0]	unchecked	[1]	2.	[2]	BC-JAS	[3]	1878985	[4]	SAP NetWeaver AS Java 7.30 SP9 List of corrections	[5]	06.08.2013	[6]	Upgrade information	[7]	Recommendations / Additional Info	
-*/
-
-
-/*
-
-
-//			SimpleDateFormat sdSUser = new SimpleDateFormat("dd.MM.yyyy");
-
-*/
