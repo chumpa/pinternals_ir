@@ -23,8 +23,6 @@ import java.util.Scanner;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-import javafx.util.Pair;
-
 import javax.xml.bind.JAXB;
 
 import org.apache.http.HttpHost;
@@ -51,19 +49,27 @@ import com.sap.Entry;
 import com.sap.Properties;
 
 public class Launchpad {
-	static final Charset utf8 = Charset.forName("UTF-8");
+	private static final Charset utf8 = NotesRetriever.utf8;
 	Path path, arealist;
 	Map<String,Set<Path>> mp = null;
 	Map<Path,Set<String>> pm = null;
 	Map<Path,NotesDB> pn = null;
+	private WebClient wc = null;
+	private String uname; 
+	private HttpHost prHost;
+	private Credentials prCred;
 
-	Launchpad (Path o) throws IOException {
-		this.path = o;
+	Launchpad (Cache cache, String uname, HttpHost prHost, Credentials prCred) throws IOException {
+		this.path = cache.launchpad;
 		arealist = Cache.fs.getPath(path.toString(), "arealist.txt");
 		if (!Files.isRegularFile(arealist)) Files.createFile(arealist);
+		this.uname = uname;
+		this.prHost = prHost;
+		this.prCred = prCred;
 	}
-	void z2(Cache cache, NotesDB db) throws IOException, SQLException {
-		List<Pair<String,String>> ap = db.getAreas();
+	void z2(NotesDB db) throws IOException, SQLException {
+		Area.init(db);
+		Area.reload();
 		List<String> ar = new LinkedList<String>(), ax = new LinkedList<String>();
 		Scanner a = new Scanner(Files.newBufferedReader(arealist, utf8));
 		BufferedWriter bw;
@@ -79,15 +85,18 @@ public class Launchpad {
 			if (!Files.isDirectory(p)) Files.createDirectory(p);
 			if (!Files.isRegularFile(dx)) {
 				pn.put(p, NotesDB.initDBA(dx));
-			} else
-				pn.put(p, NotesDB.openDBA(dx));
+			} else {
+				NotesDB dbx = NotesDB.openDBA(dx);
+				pn.put(p, dbx);
+				// the DB is legacy so we to import something interesting
+				db.merge(dbx);
+			}
 			List<Pattern> lp = new LinkedList<Pattern>();
 			for (int i=1; i<z.length; i++) 
 				lp.add(Pattern.compile(z[i]));
 
-			for (Pair<String,String> xx: ap) {
+			for (String x: Area.areaToDescr.keySet()) {
 				boolean g = false;
-				String x = xx.getKey();
 				for (Pattern pt: lp)
 					g = g || pt.matcher(x).matches();
 				if (g) {
@@ -110,22 +119,50 @@ public class Launchpad {
 			bw.close();
 		}
 		a.close();
-
-		Path p = Cache.fs.getPath(path.toString(), "Zzz");
-		bw = Files.newBufferedWriter(p, utf8);
-		for (Pair<String,String> xx: ap) {
-			String x = xx.getKey(), d = xx.getValue();
-			if (d!=null)
-				bw.write(x+"\t" + d + "\t" + ar.contains(x) + "\n");
-			else 
-				bw.write(x+"\t" + ar.contains(x) + "\n");
+//		Path p = Cache.fs.getPath(path.toString(), "Zzz");
+//		bw = Files.newBufferedWriter(p, utf8);
+//		for (Pair<String,String> xx: ap) {
+//			String x = xx.getKey(), d = xx.getValue();
+//			if (d!=null)
+//				bw.write(x+"\t" + d + "\t" + ar.contains(x) + "\n");
+//			else 
+//				bw.write(x+"\t" + ar.contains(x) + "\n");
+//		}
+//		bw.close();
+	}
+	void a2(NotesDB db, String pat) throws SQLException, IOException, ParseException {
+		Area.init(db);
+		Area.reload();
+		List<String> ar = new LinkedList<String>();
+		for (String x: Area.areaToDescr.keySet()) if (Area.areaToDescr.get(x)==null) ar.add(x);
+		List<Integer> a2 = db.arrrrrrrrrr(ar, pat);
+		System.out.println(a2);
+		for (int num: a2) {
+			if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+			URL u = getByScheme("E", num, 0);
+			Path tmp = Cache.fs.getPath(String.format("%010d.xml", num));
+	    	BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
+	    	Page o = wc.getPage(u);
+	    	WebResponse wr = o.getWebResponse();
+	    	int rc = wr.getStatusCode();
+	    	w.write(wr.getContentAsString());
+	    	w.close();
+	    	if (rc>=200 && rc<=299) {
+	    		Entry en = JAXB.unmarshal(tmp.toFile(), Entry.class);
+	    		String x = en.getContent().getProperties().getComponentKey(), y = en.getContent().getProperties().getComponentText();
+	    		System.out.println(String.format("%s\t%s", x, y));
+	    		Area.handleLaunchpad(x, y);
+	    		Files.delete(tmp);
+	    	} else {
+	    		System.err.println(num + "\tHTTP_ERROR:"+rc);
+	    	}			
 		}
-		bw.close();
+		Area.updateLaunchpad();
+		if (wc!=null) wc.close();
 	}
 	
-	void z3(Cache cache, NotesDB db, String uname, HttpHost prHost, Credentials prCred) throws SQLException, IOException, ParseException {
-		assert pm!=null && mp!=null;
-		WebClient wc = null;
+	void z3(NotesDB db) throws SQLException, IOException, ParseException {
+		assert pm!=null && mp!=null : "call z2 first";
 		for (Path par: pm.keySet()) {
 			System.out.println(par.getFileName().toString());
 			NotesDB dba = pn.get(par);
@@ -144,17 +181,22 @@ public class Launchpad {
 				    	int rc = wr.getStatusCode();
 				    	w.write(wr.getContentAsString());
 				    	w.close();
+			    		System.out.print(az.num);
 				    	if (rc>=200 && rc<=299) {
-				    		System.out.println(az.num);
 				    		Entry en = JAXB.unmarshal(tmp.toFile(), Entry.class);
-				    		System.out.println(en.getContent().getProperties().getSapNotesKey());
+				    		System.out.println("\t" + area +"\t"+en.getContent().getProperties().getSapNotesKey()+"\t"+en.getContent().getProperties().getType());
 				    		dba.put(en.getContent().getProperties(), Instant.now());
+				    		Files.delete(tmp);
 				    	} else {
-				    		System.err.println(rc);
+				    		System.err.println("\tHTTP_ERROR:"+rc);
 				    	}
+					} else {
+						// check for other properties
+//						System.out.println(String.format("%010d %s %d", az.num, az.lang, 0));
+//						System.exit(0);
+//						URL u = getByScheme(az., az.num, 0);
 					}
 				}
-				System.out.println(azl);
 			}
 			dba.close();
 		}
@@ -270,9 +312,8 @@ public class Launchpad {
 	    x = Instant.now().toString();
 	    System.out.println(x);
 	}
-
+	void close() {
+		if (wc!=null) wc.close();
+	}
 }
-
-
-// https://smpdl.sap-ag.de/~swdc/012002523100020457252015E/CDLABEL.htm?_ACTION=CONTENT_INFO
 
