@@ -13,7 +13,6 @@ import java.math.BigInteger;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
-import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyManagementException;
@@ -56,6 +55,16 @@ import org.apache.http.impl.client.CloseableHttpClient;
 import com.sap.Snotes;
 import com.sun.org.apache.xml.internal.security.utils.Base64;
 
+enum EScheme {
+	CompareVersions, NotePrintVersion, NoteLastFancyVersion, NoteListForm, NoteStatistic,
+	NoteWUL, NoteAttachment, NoteChangeLog, InternalMemo, SSCR, Pilot,
+	CWB, Nit, DPA, PutDownloadBasket, NoteList,
+	
+	//util
+	ZVersions, ZRoot, UserProfile
+	;
+}
+
 class NoteListItem {
 	String objid = null; // like @value of <INPUT TYPE="checkbox" NAME="MARK" VALUE="012003146900001956932014">
 	String apparea = null;
@@ -85,7 +94,7 @@ class ParseIndexContext {
 	List<Pair<String,String>> lapps = null;
 	List<String> lerrors = null;
 	ParseIndexContext(DateTimeFormatter dtf, String lang) {
-		assert lang.equals("D")||lang.equals("E")||lang.equals("J") : "Language isn't DEJ";
+		assert "DEJ".contains(lang) : "Language isn't DEJ";
 		assert dtf!=null;
 		this.dtf = dtf;
 		this.lang = lang;
@@ -410,7 +419,7 @@ public class Support {
 		if (Files.isRegularFile(p)) {
 			Path pnew = Cache.fs.getPath(p.toString() + ".old." + Instant.now().getNano());
 			Files.move(p, pnew);
-			throw new RuntimeException(p.toString());
+//			throw new RuntimeException(p.toString());
 		}
 		Files.move(ar, p);
 //		DirectoryStream<Path> qq = Files.newDirectoryStream(dir);
@@ -558,44 +567,44 @@ public class Support {
 		return u;
 	}
 
-	String getObjid(CloseableHttpClient cl, HttpClientContext htx
-			, Cache cache, int number, boolean httpEnable) 
-			throws IOException, URISyntaxException {
-		assert number > 0;
-		
-		String objid = null;
-		HttpGet get;
-		Scanner a;
-		Pattern pt;
-		String q;
-		int j="002007204200000280162010".length();
-		pt = Pattern.compile("/sap/support/notes/statistic/reads.htm\\?iv_key=([0-9]{"+j+"})");
-		Path dir = cache.getPathByScheme(EScheme.ZRoot, number, null);
-		DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*_fancy_?.html");
-		Iterator<Path> it = ds.iterator();
-		q = null;
-		while (it.hasNext()) {
-			a = new Scanner(it.next(), utf8.name());
-			q = a.findWithinHorizon(pt, 100000);
-			if (q!=null) objid = new String(q.substring(q.length()-j, q.length()));
-			a.close();
-		}
-		if (httpEnable&&(objid==null||"".equals(objid))) {
-			Path latestFancy = cache.getPathByScheme(EScheme.NoteLastFancyVersion, number, "E", 0);
-			get = new HttpGet(getUrl(htx, EScheme.NoteLastFancyVersion, "E", number));
-			entityToFile(cl.execute(get).getEntity(), latestFancy, cp1252, utf8);
-			a = new Scanner(latestFancy);
-			q = a.findWithinHorizon(pt, 100000);
-			if (q!=null) objid = new String(q.substring(q.length()-j, q.length()));
-			a.close();
-		}
-		return objid;
-//    	Path dl = cache.getPathByScheme(EScheme.PutDownloadBasket, number, null);
-//		if (!Files.isRegularFile(dl)) {
-//			get = new HttpGet(getUrl(htx, EScheme.PutDownloadBasket, null, objid));
-//			entityToFile(cl.execute(get).getEntity(), dl, fromCs, toCs);
+//	String getObjid(CloseableHttpClient cl, HttpClientContext htx
+//			, Cache cache, int number, boolean httpEnable) 
+//			throws IOException, URISyntaxException {
+//		assert number > 0;
+//		
+//		String objid = null;
+//		HttpGet get;
+//		Scanner a;
+//		Pattern pt;
+//		String q;
+//		int j="002007204200000280162010".length();
+//		pt = Pattern.compile("/sap/support/notes/statistic/reads.htm\\?iv_key=([0-9]{"+j+"})");
+//		Path dir = cache.getPathByScheme(EScheme.ZRoot, number, null);
+//		DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*_fancy_?.html");
+//		Iterator<Path> it = ds.iterator();
+//		q = null;
+//		while (it.hasNext()) {
+//			a = new Scanner(it.next(), utf8.name());
+//			q = a.findWithinHorizon(pt, 100000);
+//			if (q!=null) objid = new String(q.substring(q.length()-j, q.length()));
+//			a.close();
 //		}
-	}
+//		if (httpEnable&&(objid==null||"".equals(objid))) {
+//			Path latestFancy = cache.getPathByScheme(EScheme.NoteLastFancyVersion, number, "E", 0);
+//			get = new HttpGet(getUrl(htx, EScheme.NoteLastFancyVersion, "E", number));
+//			entityToFile(cl.execute(get).getEntity(), latestFancy, cp1252, utf8);
+//			a = new Scanner(latestFancy);
+//			q = a.findWithinHorizon(pt, 100000);
+//			if (q!=null) objid = new String(q.substring(q.length()-j, q.length()));
+//			a.close();
+//		}
+//		return objid;
+////    	Path dl = cache.getPathByScheme(EScheme.PutDownloadBasket, number, null);
+////		if (!Files.isRegularFile(dl)) {
+////			get = new HttpGet(getUrl(htx, EScheme.PutDownloadBasket, null, objid));
+////			entityToFile(cl.execute(get).getEntity(), dl, fromCs, toCs);
+////		}
+//	}
 
 //	private static List<String> genURL(int pagesize, int pagesMaxToList, String dtfrom, String dtto, String lang) {
 //		assert lang!=null;
@@ -801,7 +810,7 @@ public class Support {
     	br.close();
 	}
 	static void cache(Cache cache, NotesDB db) throws IOException, SQLException {
-		Iterator<Path> it = cache.a();
+		Iterator<Path> it = cache.getSupportSapComNotesZip();
 		Map<String,String> cached = db.w44();  		
 
 		while (it.hasNext()) {
@@ -850,7 +859,7 @@ public class Support {
 			throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, IOException, URISyntaxException, ParseException {
 		DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
 		LocalDate b = LocalDate.parse("19900101", dtf), t, tm = LocalDate.now();
-		Iterator<Path> it = cache.a();
+		Iterator<Path> it = cache.getSupportSapComNotesZip();
 		int ps = 5000, mx = 1000000;
 		if (dtfrom!=null && dtto!=null) { 
 			probeUrl();
@@ -885,4 +894,51 @@ public class Support {
 			}
 		}
 	}
+
+//	private Path getPathByScheme(EScheme scheme, int number, String lang, Object ... args) throws IOException {
+//	assert number > 0;
+//	Path dir = rawver(number);
+//	switch (scheme) {
+//	case CompareVersions:
+//		assert isLang(lang);
+//		return fs.getPath(dir.toString(), "compare_" + lang + ".html");
+//		
+//	case ZVersions:
+//		return fs.getPath(dir.toString(), "versions.xml");
+//		
+//	case NotePrintVersion:
+//		assert isLang(lang) && args.length>0;
+//		return fs.getPath(dir.toString(), number + "_" + args[0] + "_print_" + lang + ".html");
+//		
+//	case NoteLastFancyVersion:
+//		assert isLang(lang) && args.length>0;
+//		return fs.getPath(dir.toString(), number + "_" + args[0] + "_fancy_" + lang + ".html");
+//
+//	case NoteChangeLog:
+//		assert lang==null;
+//		return fs.getPath(dir.toString(), "changelog.html");
+//
+//	case InternalMemo:
+//		assert lang==null;
+//		return fs.getPath(dir.toString(), "intmemo.html");
+//
+//	case ZRoot:
+//		assert lang==null;
+//		return dir;
+//
+//	case PutDownloadBasket:
+//		assert lang==null;
+//		return fs.getPath(dir.toString(), "dl.html");
+//		
+//	default:
+//		throw new RuntimeException("Unsupported scheme: " + scheme + " for note " + number);
+//	}
+//}
+
 }
+
+//TODO
+//https://websmp110.sap-ag.de/~form/handler?_APP=00200682500000002095&_EVENT=DISPL_MAIN&_COMP=		application areas viewer
+//https://smpdl.sap-ag.de/~swdc/012002523100020457252015E/CDLABEL.htm?_ACTION=CONTENT_INFO
+//
+//
