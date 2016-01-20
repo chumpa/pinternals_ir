@@ -53,14 +53,13 @@ import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
 
 public class Utils {
-	public static String utf8 = "UTF-8";
-	public static final Charset chUtf8 = Charset.forName(utf8);
+	public static final Charset utf8 = NotesRetriever.utf8;
 	
 	static String getPasswd(String uname) throws IOException {
 		assert uname !=null && !uname.equals("");
 		try {
 			SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
-			DESKeySpec keySpec = new DESKeySpec(uname.getBytes(chUtf8)); 
+			DESKeySpec keySpec = new DESKeySpec(uname.getBytes(utf8)); 
 			SecretKey key = keyFactory.generateSecret(keySpec);
 			sun.misc.BASE64Decoder base64decoder = new BASE64Decoder();
 			BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(uname + ".pwd")));
@@ -84,11 +83,11 @@ public class Utils {
 		assert uname !=null && !uname.equals(""); 
 		assert passwd !=null && !passwd.equals("");
 		try {
-			DESKeySpec keySpec = new DESKeySpec(uname.getBytes(chUtf8)); 
+			DESKeySpec keySpec = new DESKeySpec(uname.getBytes(utf8)); 
 			SecretKeyFactory keyFactory = SecretKeyFactory.getInstance("DES");
 			SecretKey key = keyFactory.generateSecret(keySpec);
 			sun.misc.BASE64Encoder base64encoder = new BASE64Encoder();
-			byte[] cleartext = passwd.getBytes(chUtf8);
+			byte[] cleartext = passwd.getBytes(utf8);
 			Cipher cipher = Cipher.getInstance("DES"); // cipher is not thread safe
 			cipher.init(Cipher.ENCRYPT_MODE, key);
 			String encryptedPwd = base64encoder.encode(cipher.doFinal(cleartext));
@@ -218,91 +217,4 @@ public class Utils {
     	StatusLine l = rsp.getStatusLine();
     	System.out.println(l);
 	}
-
-//	public static void main_test_proxy(String[] args) throws Exception {
-//		System.out.println("Test: prxuname wks domain prx-host prx-port");
-//		HttpHost prHost = new HttpHost();
-//		NTCredentials cred = new NTCredentials();
-////		UsernamePasswordCredentials creds = new UsernamePasswordCredentials("", "");
-//		CredentialsProvider cp = new BasicCredentialsProvider();
-//		cp.setCredentials(new AuthScope(prHost), cred);
-////		cp.setCredentials(new AuthScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT), creds);
-//		
-//		CloseableHttpClient cl = HttpClients.custom()
-//        		.useSystemProperties()
-//        		.setDefaultCredentialsProvider(cp)
-//        		.setProxy(prHost)
-//        		.build();
-//		HttpClientContext htx = HttpClientContext.create();
-//		AuthState authState = new AuthState();
-//		authState.update(new NTLMScheme(), cred);
-//		htx.setAttribute(HttpClientContext.PROXY_AUTH_STATE, authState);
-//		HttpGet g;
-//		HttpPost post;
-//		CloseableHttpResponse rsp;
-//		g = new HttpGet("https://launchpad.support.sap.com/services/odata/svt/snogwscorr/");
-//		rsp = cl.execute(g, htx);
-//		Scanner a = new Scanner(rsp.getEntity().getContent(), "UTF-8");
-//		Pattern pt1 = Pattern.compile("document.cookie=&quot;(.+)&quot;");
-//		Pattern pt2 = Pattern.compile("<form method=\"post\" action=\"([^\"]+?)\">"); 
-//		Pattern pt3 = Pattern.compile("<input type=\"hidden\" name=\"(.*?)\" value=\"(.*?)\"/>"); 
-//		
-//		Matcher m;
-//		String x, cookie = null, addr = null;
-//		List<BasicNameValuePair> inps = new ArrayList<BasicNameValuePair>(); 
-//
-//		x = a.findWithinHorizon(pt1, 0);
-//		m = pt1.matcher(x);
-//		if (m.matches()) cookie = m.group(1);
-//		x = a.findWithinHorizon(pt2, 0);
-//		m = pt2.matcher(x);
-//		if (m.matches()) addr = m.group(1); 
-//		
-//		while (true) {
-//			x = a.findWithinHorizon(pt3, 0);
-//			if (x==null) break;
-//			m = pt3.matcher(x);
-//			if (m.matches()) inps.add(new BasicNameValuePair(m.group(1), m.group(2))); 
-//		}
-//		a.close();
-//
-//		System.out.println(cookie);
-//		System.out.println(addr);
-//		for (BasicNameValuePair y: inps) System.out.println(y);
-//		
-//		post = new HttpPost(addr);
-//		post.setEntity(new UrlEncodedFormEntity(inps));
-//		rsp = cl.execute(post, htx);
-//		HttpEntity e = rsp.getEntity();
-////		e.writeTo(System.out);
-//		a = new Scanner(rsp.getEntity().getContent(), "UTF-8");
-//		inps.clear();
-//		x = a.findWithinHorizon(pt2, 0);
-//		m = pt2.matcher(x);
-//		if (m.matches()) addr = m.group(1); 
-//		while (true) {
-//			x = a.findWithinHorizon(pt3, 0);
-//			if (x==null) break;
-//			m = pt3.matcher(x);
-//			if (m.matches()) inps.add(new BasicNameValuePair(m.group(1), m.group(2))); 
-//		}
-//		System.out.println(cookie);
-//		System.out.println(addr);
-//		for (BasicNameValuePair y: inps) System.out.println(y);
-//		post = new HttpPost(addr);
-//		post.setEntity(new UrlEncodedFormEntity(inps));
-//		rsp = cl.execute(post, htx);
-//		e = rsp.getEntity();
-//		e.writeTo(System.out);
-//		
-//		a.close();
-//		
-//		
-////		HttpEntity e = new 
-////		post.setEntity(e);
-////    	StatusLine l = rsp.getStatusLine();
-////		g = new HttpGet("https://launchpad.support.sap.com/services/odata/svt/snogwscorr/Zip4SSet(SapNotesNumber='0002258035',Version='4',Language='E')/$value");
-////    	System.out.println(l);
-//	}
-
 }
