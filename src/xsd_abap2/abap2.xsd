@@ -1,0 +1,419 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" xmlns:asx="http://www.sap.com/abapxml">
+  <xs:import namespace="http://www.sap.com/abapxml" schemaLocation="asx.xsd"/>
+  <xs:element name="X-ML_CWBNTHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="CWBNTHEAD"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBNTHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="NTSTATUS"/>
+        <xs:element ref="THEMK"/>
+        <xs:element ref="PRSTATUS"/>
+        <xs:element ref="INSTA"/>
+        <xs:element ref="MNUMM"/>
+        <xs:element ref="MYEAR"/>
+        <xs:element ref="INCOMPLETE"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="NTSTATUS">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="THEMK" type="xs:NCName"/>
+  <xs:element name="PRSTATUS">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="MNUMM">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="MYEAR" type="xs:integer"/>
+  <xs:element name="X-ML_CWBNTSTXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBNTSTXT"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBNTSTXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="LANGU"/>
+        <xs:element ref="STEXT"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="STEXT" type="xs:string"/>
+  <xs:element name="X-ML_HTMLTEXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="X-ML_CWBNTDATA">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="X-ML_CWBNTVALID">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBNTVALID"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBNTVALID">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="DEPAKID_V"/>
+        <xs:element ref="DEALEID_V"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="DEPAKID_V" type="xs:integer"/>
+  <xs:element name="DEALEID_V" type="xs:integer"/>
+  <xs:element name="X-ML_CWBNTCI">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBNTCI"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBNTCI">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="CIINSTA"/>
+        <xs:element ref="CIPAKID"/>
+        <xs:element ref="CIALEID"/>
+        <xs:element ref="CIVERSNO"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CIINSTA" type="xs:integer"/>
+  <xs:element name="CIPAKID" type="xs:integer"/>
+  <xs:element name="CIALEID" type="xs:integer"/>
+  <xs:element name="CIVERSNO" type="xs:integer"/>
+  <xs:element name="X-ML_CWBNTFIXED">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBNTFIXED"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBNTFIXED">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="X-ML_CWBNTGATTR">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBNTGATTR"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBNTGATTR">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="ID"/>
+        <xs:element ref="VALUE"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ID" type="xs:NCName"/>
+  <xs:element name="VALUE" type="xs:NMTOKEN"/>
+  <xs:element name="X-ML_CWBCIHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBCIHEAD"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="X-ML_CWBCIHEAD3">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBCIHEAD"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="X-ML_CWBCIVALID">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBCIVALID"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBCIVALID">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="INSTA"/>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="TRPAKID"/>
+        <xs:element ref="TRTYPEID"/>
+        <xs:element ref="TRALSID"/>
+        <xs:element ref="DEPAKID_LO"/>
+        <xs:element ref="DEALEID_LO"/>
+        <xs:element ref="DEPAKID_HI"/>
+        <xs:element ref="DEALEID_HI"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="TRPAKID" type="xs:integer"/>
+  <xs:element name="TRTYPEID" type="xs:NCName"/>
+  <xs:element name="TRALSID" type="xs:integer"/>
+  <xs:element name="DEPAKID_LO" type="xs:integer"/>
+  <xs:element name="DEALEID_LO" type="xs:integer"/>
+  <xs:element name="DEPAKID_HI" type="xs:integer"/>
+  <xs:element name="DEALEID_HI" type="xs:integer"/>
+  <xs:element name="X-ML_CWBCIINVLD">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="X-ML_CWBCIFIXED">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="X-ML_CWBCIDPNDC">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="X-ML_CWBCIOBJ">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBCIOBJ"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBCIOBJ">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="INSTA"/>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="PGMID"/>
+        <xs:element ref="OBJECT"/>
+        <xs:element ref="OBJ_NAME"/>
+        <xs:element ref="TRPGMID"/>
+        <xs:element ref="TROBJECT"/>
+        <xs:element ref="TROBJ_NAME"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="PGMID" type="xs:NCName"/>
+  <xs:element name="OBJECT" type="xs:NCName"/>
+  <xs:element name="OBJ_NAME" type="xs:string"/>
+  <xs:element name="TRPGMID" type="xs:NCName"/>
+  <xs:element name="TROBJECT" type="xs:NCName"/>
+  <xs:element name="TROBJ_NAME" type="xs:NCName"/>
+  <xs:element name="X-ML_CWBCMPNT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="CWBCMPNT"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBCMPNT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="PAKTXT"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="PAKTXT" type="xs:NCName"/>
+  <xs:element name="X-ML_CWBCMTEXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBCMTEXT"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBCMTEXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="LANGU"/>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="DESCR"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="DESCR" type="xs:string"/>
+  <xs:element name="X-ML_CWBCMLAST">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="CWBCMLAST"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBCMLAST">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="TSTAMP"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="TSTAMP" type="xs:integer"/>
+  <xs:element name="X-ML_CWBDEHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBDEHEAD"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBDEHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+        <xs:element ref="ALETXT"/>
+        <xs:element ref="TYPID"/>
+        <xs:element ref="ALSID"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ALETXT" type="xs:string"/>
+  <xs:element name="X-ML_CWBDEPRDC">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBDEPRDC"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBDEPRDC">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+        <xs:element ref="PAKID_P"/>
+        <xs:element ref="ALEID_P"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="PAKID_P" type="xs:integer"/>
+  <xs:element name="ALEID_P" type="xs:integer"/>
+  <xs:element name="X-ML_CWBDETRACK">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="CWBDETRACK"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CWBDETRACK">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="TYPID"/>
+        <xs:element ref="ALSID"/>
+        <xs:element ref="ALSTXT"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ALSTXT" type="xs:string"/>
+  <xs:element name="X-ML_CWBDEEQUIV">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="X-ML_LCWBNTSTXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="X-ML_CWBCINSTATTR">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="NUMM" type="xs:integer"/>
+  <xs:element name="VERSNO" type="xs:integer"/>
+  <xs:element name="INSTA" type="xs:string"/>
+  <xs:element name="INCOMPLETE" type="xs:string"/>
+  <xs:element name="LANGU" type="xs:string"/>
+  <xs:element name="item">
+    <xs:complexType>
+      <xs:choice>
+        <xs:sequence>
+          <xs:element ref="LANGU"/>
+          <xs:element ref="DATA"/>
+        </xs:sequence>
+        <xs:sequence>
+          <xs:element ref="NOTE"/>
+          <xs:element ref="TEXT"/>
+        </xs:sequence>
+      </xs:choice>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="DATA" type="xs:base64Binary"/>
+  <xs:element name="NOTE">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="NUMM"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="LANGU"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="TEXT">
+    <xs:complexType mixed="true">
+      <xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="TLINE"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="TLINE">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="TDFORMAT"/>
+        <xs:element ref="TDLINE"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="TDFORMAT" type="xs:string"/>
+  <xs:element name="TDLINE" type="xs:string"/>
+  <xs:element name="PAKID" type="xs:integer"/>
+  <xs:element name="ALEID" type="xs:integer"/>
+  <xs:element name="CWBCIHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="INSTA"/>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="FORMAT_ID"/>
+        <xs:element ref="INCOMPLETE"/>
+        <xs:element ref="MANUAL_ACTIVITY"/>
+        <xs:element ref="IS_TRANSPORTABLE"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="FORMAT_ID" type="xs:integer"/>
+  <xs:element name="MANUAL_ACTIVITY">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="IS_TRANSPORTABLE">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="TYPID" type="xs:string"/>
+  <xs:element name="ALSID" type="xs:integer"/>
+</xs:schema>
