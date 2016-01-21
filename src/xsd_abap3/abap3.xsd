@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" xmlns:asx="http://www.sap.com/abapxml">
+  <xs:import namespace="http://www.sap.com/abapxml" schemaLocation="asx.xsd"/>
+  <xs:element name="X-ML_CWBCIDATA">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="item">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:sequence minOccurs="0">
+          <xs:element ref="CIHEAD"/>
+          <xs:element ref="DELTAS"/>
+        </xs:sequence>
+        <xs:choice minOccurs="0">
+          <xs:element ref="DELETE"/>
+          <xs:element ref="INSERT"/>
+        </xs:choice>
+        <xs:element minOccurs="0" ref="CODE_BLOCK_DELTAS"/>
+        <xs:sequence minOccurs="0">
+          <xs:element ref="ID"/>
+          <xs:element ref="ELEMENTARY_DELTAS"/>
+          <xs:element ref="LINNO"/>
+          <xs:element ref="CONTEXT"/>
+        </xs:sequence>
+        <xs:element minOccurs="0" ref="LINE"/>
+        <xs:sequence minOccurs="0">
+          <xs:element ref="HEADER"/>
+          <xs:element ref="STATEMENT_PATTERNS"/>
+        </xs:sequence>
+        <xs:element minOccurs="0" maxOccurs="unbounded" ref="STOKEN_--2DSTR"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CIHEAD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="INSTA"/>
+        <xs:element ref="PAKID"/>
+        <xs:element ref="ALEID"/>
+        <xs:element ref="VERSNO"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="INSTA" type="xs:integer"/>
+  <xs:element name="PAKID" type="xs:integer"/>
+  <xs:element name="ALEID" type="xs:integer"/>
+  <xs:element name="DELTAS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="DELETE">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="INSERT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="CODE_BLOCK_DELTAS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element minOccurs="0" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ID">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="ELEMENTARY_DELTAS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="LINNO" type="xs:integer"/>
+  <xs:element name="CONTEXT">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="LINE" type="xs:string"/>
+  <xs:element name="HEADER">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="OLD"/>
+        <xs:element ref="NEW"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="OLD">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PGMID"/>
+        <xs:element ref="OBJTYPE"/>
+        <xs:element ref="OBJNAME"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="DESTINATION"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="NEW">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="PGMID"/>
+        <xs:element ref="OBJTYPE"/>
+        <xs:element ref="OBJNAME"/>
+        <xs:element ref="VERSNO"/>
+        <xs:element ref="DESTINATION"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="STATEMENT_PATTERNS">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="item"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="STOKEN_--2DSTR" type="xs:string"/>
+  <xs:element name="VERSNO" type="xs:integer"/>
+  <xs:element name="PGMID" type="xs:NCName"/>
+  <xs:element name="OBJTYPE" type="xs:NCName"/>
+  <xs:element name="OBJNAME" type="xs:string"/>
+  <xs:element name="DESTINATION" type="xs:string"/>
+</xs:schema>
