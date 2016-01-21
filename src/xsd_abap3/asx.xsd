@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.sap.com/abapxml" xmlns:asx="http://www.sap.com/abapxml">
+  <xs:import schemaLocation="abap3.xsd"/>
+  <xs:element name="abap">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="asx:values"/>
+      </xs:sequence>
+      <xs:attribute name="version" use="required" type="xs:decimal"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="values">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="X-ML_CWBCIDATA"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
