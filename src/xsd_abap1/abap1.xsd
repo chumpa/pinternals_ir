@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.sap.com/abapxml" xmlns:asx="http://www.sap.com/abapxml">
+  <xs:element name="abap">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="asx:values"/>
+      </xs:sequence>
+      <xs:attribute name="version" use="required" type="xs:decimal"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="values">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="X-ML_DATA_BIN" form="unqualified" type="xs:base64Binary"/>
+        <xs:element name="X-ML_CODE_DELTA_BINT" form="unqualified" type="xs:base64Binary"/>
+        <xs:element name="X-ML_OBJECT_DATA_BIN" form="unqualified">
+          <xs:complexType>
+            <xs:sequence>
+              <xs:element maxOccurs="unbounded" name="CWBCIOBJDELTA" form="unqualified">
+                <xs:complexType>
+                  <xs:sequence>
+                    <xs:element name="INSTA" form="unqualified" type="xs:integer"/>
+                    <xs:element name="PAKID" form="unqualified" type="xs:integer"/>
+                    <xs:element name="ALEID" form="unqualified" type="xs:integer"/>
+                    <xs:element name="VERSNO" form="unqualified" type="xs:integer"/>
+                    <xs:element name="PGMID" form="unqualified" type="xs:NCName"/>
+                    <xs:element name="OBJTYPE" form="unqualified" type="xs:NCName"/>
+                    <xs:element name="OBJNAME" form="unqualified" type="xs:string"/>
+                    <xs:element name="SUB_NAME" form="unqualified" type="xs:string"/>
+                    <xs:element name="OBJECT_DATA" form="unqualified" type="xs:base64Binary"/>
+                  </xs:sequence>
+                </xs:complexType>
+              </xs:element>
+            </xs:sequence>
+          </xs:complexType>
+        </xs:element>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
