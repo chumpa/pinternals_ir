@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://www.sap.com/abapxml" xmlns:asx="http://www.sap.com/abapxml">
+  <xs:import schemaLocation="abap2.xsd"/>
+  <xs:element name="abap">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="asx:values"/>
+      </xs:sequence>
+      <xs:attribute name="version" use="required" type="xs:decimal"/>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="values">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="X-ML_CWBNTHEAD"/>
+        <xs:element ref="X-ML_CWBNTSTXT"/>
+        <xs:element ref="X-ML_HTMLTEXT"/>
+        <xs:element ref="X-ML_CWBNTDATA"/>
+        <xs:element ref="X-ML_CWBNTVALID"/>
+        <xs:element ref="X-ML_CWBNTCI"/>
+        <xs:element ref="X-ML_CWBNTFIXED"/>
+        <xs:element ref="X-ML_CWBNTGATTR"/>
+        <xs:element ref="X-ML_CWBCIHEAD"/>
+        <xs:element ref="X-ML_CWBCIHEAD3"/>
+        <xs:element ref="X-ML_CWBCIVALID"/>
+        <xs:element ref="X-ML_CWBCIINVLD"/>
+        <xs:element ref="X-ML_CWBCIFIXED"/>
+        <xs:element ref="X-ML_CWBCIDPNDC"/>
+        <xs:element ref="X-ML_CWBCIOBJ"/>
+        <xs:element ref="X-ML_CWBCMPNT"/>
+        <xs:element ref="X-ML_CWBCMTEXT"/>
+        <xs:element ref="X-ML_CWBCMLAST"/>
+        <xs:element ref="X-ML_CWBDEHEAD"/>
+        <xs:element ref="X-ML_CWBDEPRDC"/>
+        <xs:element ref="X-ML_CWBDETRACK"/>
+        <xs:element ref="X-ML_CWBDEEQUIV"/>
+        <xs:element ref="X-ML_LCWBNTSTXT"/>
+        <xs:element ref="X-ML_CWBCINSTATTR"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
