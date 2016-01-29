@@ -71,12 +71,13 @@ enum ECat {
 }
 
 class Area {
-	protected static Map<String,Integer> areaToCode = new HashMap<String,Integer>();
-	protected static Map<String,String> areaToDescr = new HashMap<String,String>();
+	static Map<String,Integer> areaToCode = new HashMap<String,Integer>();
+	static Map<String,String> areaToDescr = new HashMap<String,String>();
+	static Map<String,Set<String>> nickToArea = new HashMap<String,Set<String>>();
 	private static Set<String> zz2 = new HashSet<String>();
 	private static PreparedStatement aa02get, aa02put, aa02upd;
 	private static boolean aa02 = false;
-	static void init(NotesDB db) throws SQLException {//PreparedStatement aa02ge, PreparedStatement aa02pu, PreparedStatement aa02up) {
+	static void init(NotesDB db) throws SQLException {
 		aa02get = db.sql("02appareaget");
 		aa02put = db.sqlUpd("02appareaput");
 		aa02upd = db.sqlUpd("02appareaupd");
@@ -154,23 +155,41 @@ class Area {
 
 public class NotesDB {
 	private static final int SAP_KBA=1, SAP_UNKNOWNYET=0;
-	private Connection con = null;
-	private int eu;	// for asserts
 	private static ResourceBundle ddlrb = ResourceBundle.getBundle("com/pinternals/ir/ddl");
 	private static ResourceBundle sqlrb = ResourceBundle.getBundle("com/pinternals/ir/sql");
 
+	private Connection con = null;
+	boolean dba = false;
+	private int eu, ia[];	// for asserts
+	private Map<String,Integer> areaAreas = null;	// for DBA only
+	Path pathdb = null;
+	
+	/**
+	 * look for sql.properties
+	 * @param code
+	 * @return
+	 */
 	private static String ddl(String code) {
+		assert code!=null;
 		return ddlrb.getString(code);
 	}
 	protected PreparedStatement sql(String code) throws SQLException {
+		assert code!=null;
 		return con.prepareStatement(sqlrb.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 	}
+	/**
+	 * TODO: rewrite to truly updatable prepared statements
+	 * @param code
+	 * @return
+	 * @throws SQLException
+	 */
 	protected PreparedStatement sqlUpd(String code) throws SQLException {
+		assert code!=null;
 		return con.prepareStatement(sqlrb.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 	}
 
 	static void initDB(Path db) throws SQLException {
-		NotesDB ndb = new NotesDB(db, false);
+		NotesDB ndb = new NotesDB(db, false, false);
 
 		for (String s: ddlrb.keySet()) if (s.startsWith("0")) {
 			System.out.println(s);
@@ -186,7 +205,7 @@ public class NotesDB {
 	}
 	
 	static NotesDB initDBA(Path db) throws SQLException {
-		NotesDB ndb = new NotesDB(db, false);
+		NotesDB ndb = new NotesDB(db, false, true);
 		for (String s: ddlrb.keySet()) if (s.startsWith("a")) 
 			ndb.con.prepareStatement(ddl(s)).execute();
 		ndb.con.commit();
@@ -194,22 +213,30 @@ public class NotesDB {
 	}	
 
 	static NotesDB openDBA(Path db) throws SQLException {
-		NotesDB ndb = new NotesDB(db, false);
+		NotesDB ndb = new NotesDB(db, false, true);
 		ndb.con.commit();
 		return ndb;
 	}	
 	
-	NotesDB(Path file, boolean checksql) throws SQLException {
+	NotesDB(Path pat, boolean checksql, boolean isdba) throws SQLException {
+		this.pathdb = pat;
 		try {
 			Class.forName("org.sqlite.JDBC");
 		} catch (ClassNotFoundException c) {
 			throw new SQLException("Cannot load sqlite JDBC driver");
 		}
-		con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + file.toFile());
+		con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + pat.toFile());
 		con.setAutoCommit(false);
 		if (checksql) for (String s: sqlrb.keySet()) sql(s);	// is statement compilable ?
+		this.dba = isdba;
 	}
 
+	boolean isClosed() throws SQLException {
+		return con.isClosed();
+	}
+	void commit() throws SQLException {
+		con.commit();
+	}
 	void close() throws SQLException {
 		con.commit();
 		con.close();
@@ -223,6 +250,7 @@ public class NotesDB {
 		}
 		r.close();
 	}	
+
 
 	Map<String,String> w44() throws SQLException {
 		PreparedStatement fcget = sql("009a");
@@ -281,7 +309,7 @@ public class NotesDB {
 		for (JaxbNote x: sn.getNS()) {
 			String xa = x.getA(), xp = x.getP(), xc = x.getC(), xo = x.getO(), xl = x.getL(), xm = x.getM(), xcon = x.getContent();
 			int num = x.getN();
-			assert num<bsmaxnotes : String.format("Notes number %d have to be lt %d, num, bsmaxnotes");
+			assert num<bsmaxnotes : String.format("Note number %d have to be lt %d", num, bsmaxnotes);
 			Integer pr = prio.get(xp);
 			Integer ca = cat.get(xc);
 			if (pr==null) System.err.println(String.format("Note #%d, priority unknown: %s %s", num, xp, StringEscapeUtils.escapeJava(xp) ));
@@ -350,6 +378,7 @@ public class NotesDB {
 		ps.close();
 		return az;
 	}
+	
 	void getZ3a(List<AZ> azl) throws SQLException {
 		PreparedStatement ps = con.prepareStatement("select askdate,NotesKey,"
 				+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language from a01 where NotesNumber=?;");
@@ -375,28 +404,75 @@ public class NotesDB {
 		}
 	}
 
+	PreparedStatement ps3b = null;
+	List<AZ> getZ3b() throws SQLException {
+		List<AZ> azl = new ArrayList<AZ>(10000);
+		if (ps3b==null) ps3b = con.prepareStatement("select askdate,NotesKey,"
+				+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language,NotesNumber, "
+				+ "(select count(*) from LongText t where t.NotesNumber=a.NotesNumber and t.Language=a.Language and t.Version=a.Version) longtexts"
+				+ " from a01 a;");
+		ResultSet rs;
+		rs = ps3b.executeQuery();
+		while (rs.next()) {
+			AZ az = new AZ(rs.getInt(12), rs.getString(9), rs.getString(2));
+			com.sap.Properties p = new Properties();
+			p.setSapNotesNumber(String.valueOf(rs.getInt(12)));
+			p.setSapNotesKey(rs.getString(2));
+			p.setTitle(rs.getString(3));
+			p.setType(rs.getString(4));
+			p.setVersion(rs.getString(5));
+			p.setPriority(rs.getString(6));
+			p.setCategory(rs.getString(7));
+			p.setReleasedOn(rs.getString(8));
+			p.setComponentKey(rs.getString(9));
+			p.setComponentText(rs.getString(10));
+			p.setLanguage(rs.getString(11));
+			az.foundA(rs.getString(1), p);
+			az.longTexts = rs.getInt(13);
+			
+			azl.add(az);
+		}
+		return azl;
+	}
+
+	PreparedStatement psPut = null;
 	void put(Properties p, Instant n) throws SQLException {
-		PreparedStatement ps = con.prepareStatement("insert into a01(askdate,NotesNumber,NotesKey,"
+		if (psPut==null) psPut = con.prepareStatement("insert into a01(askdate,NotesNumber,NotesKey,"
 			+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language) values (?,?,?,?,?,?,?,?,?,?,?,?);");
 		String askdate = n.toString();
-		ps.setString(1, askdate);
-		ps.setInt(2, Integer.valueOf(p.getSapNotesNumber()));
-		ps.setString(3, p.getSapNotesKey());
-		ps.setString(4, p.getTitle());
-		ps.setString(5, p.getType());
-		ps.setInt(6, Integer.valueOf(p.getVersion()));	// version
-		ps.setString(7, p.getPriority()); // priority
-		ps.setString(8, p.getCategory());
-		ps.setString(9, p.getReleasedOn());
-		ps.setString(10, p.getComponentKey());
-		ps.setString(11, p.getComponentText());
-		ps.setString(12, p.getLanguage());
-		eu = ps.executeUpdate();
+		psPut.setString(1, askdate);
+		psPut.setInt(2, Integer.valueOf(p.getSapNotesNumber()));
+		psPut.setString(3, p.getSapNotesKey());
+		psPut.setString(4, p.getTitle());
+		psPut.setString(5, p.getType());
+		psPut.setInt(6, Integer.valueOf(p.getVersion()));	// version
+		psPut.setString(7, p.getPriority()); // priority
+		psPut.setString(8, p.getCategory());
+		psPut.setString(9, p.getReleasedOn());
+		psPut.setString(10, p.getComponentKey());
+		psPut.setString(11, p.getComponentText());
+		psPut.setString(12, p.getLanguage());
+		eu = psPut.executeUpdate();
 		assert eu == 1;
 		con.commit();
 	}
 
-	void merge(NotesDB dba) throws SQLException {
+	PreparedStatement psPutf = null;
+	void put(String facet, Properties o, Properties p, Instant n) throws SQLException {
+		if (psPutf==null) psPutf = con.prepareStatement("insert into LongText(askdate,NotesNumber,Version,Language,TypeKey,Text) values (?,?,?,?,?,?);");
+		String askdate = n.toString();
+		psPutf.setString(1, askdate);
+		psPutf.setInt(2, Integer.valueOf(o.getSapNotesNumber()));
+		psPutf.setInt(3, Integer.valueOf(o.getVersion()));
+		psPutf.setString(4, o.getLanguage());
+		psPutf.setInt(5, Integer.valueOf(p.getTypeKey()));
+		psPutf.setString(6, p.getText());
+		eu = psPutf.executeUpdate();
+		assert eu == 1;
+	}
+	
+	// area-db into notes.db
+	void fromDBAtoCDB(NotesDB dba) throws SQLException {
 		// dba == area db
 		assert dba!=null && dba.con!=null && !dba.con.isClosed();
 		PreparedStatement px = dba.con.prepareStatement("select NotesNumber,Version,NotesKey,"
@@ -518,13 +594,18 @@ public class NotesDB {
 			}
 		}
 		px.close();
-		int ia[] = zzz2.executeBatch();
+		ia = zzz2.executeBatch();
+		eu = ia.length;
 		ia = mr02.executeBatch();
+		eu += ia.length;
 		ia = zy3.executeBatch();
+		eu += ia.length;
 		ia = mr05.executeBatch();
+		eu += ia.length;
 		ia = mr09.executeBatch();
+		eu += ia.length;
 		con.commit();
-		System.out.println(ia);
+		assert eu>0;
 	}
 	
 	List<Integer> arrrrrrrrrr(List<String> as, String pat) throws SQLException {
@@ -544,5 +625,41 @@ public class NotesDB {
 			}
 		}
 		return ar;
+	}
+
+	/**
+	 * called from launchpad for <area>.db
+	 * @param area	like BC-XI-CON-AFW-SEC or FI-AA
+	 * @param code	dynamic integer
+	 */
+	void addArea(String area, int code) {
+		assert dba;
+		if (areaAreas==null) areaAreas = new HashMap<String,Integer>();
+		// TODO assert for code differences for one area (look into Area)  
+		areaAreas.put(area, code);
+	}
+
+	/**
+	 * Mutual synchronization of central notes.db and many of <area>.db
+	 * @param colldba collection of <area>.db objects
+	 * @throws SQLException
+	 */
+	void sync(NotesDB dba) throws SQLException {
+		assert dba.dba && !dba.isClosed();
+		System.out.println("sync " + pathdb + " with " + dba.pathdb);
+		fromDBAtoCDB(dba);	// one way
+//		fromCDBtoDBA(dba);
+		bsnums = new BitSet(bsmaxnotes);
+		
+	}
+	/**
+	 * for C:\sap\notes-cache\launchpad\<u>xi</u>\xi.db returns xi
+	 * @return nickname
+	 */
+	String getNick() {
+		assert dba;
+		assert pathdb.getNameCount()>2;
+		String nick = pathdb.getName(pathdb.getNameCount()-2).toString();
+		return nick;
 	}
 }

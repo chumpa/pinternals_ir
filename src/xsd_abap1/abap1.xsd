@@ -19,12 +19,12 @@
               <xs:element maxOccurs="unbounded" name="CWBCIOBJDELTA" form="unqualified">
                 <xs:complexType>
                   <xs:sequence>
-                    <xs:element name="INSTA" form="unqualified" type="xs:integer"/>
-                    <xs:element name="PAKID" form="unqualified" type="xs:integer"/>
-                    <xs:element name="ALEID" form="unqualified" type="xs:integer"/>
-                    <xs:element name="VERSNO" form="unqualified" type="xs:integer"/>
-                    <xs:element name="PGMID" form="unqualified" type="xs:NCName"/>
-                    <xs:element name="OBJTYPE" form="unqualified" type="xs:NCName"/>
+                    <xs:element name="INSTA" form="unqualified" type="xs:string"/>
+                  	<xs:element name="PAKID" form="unqualified" type="xs:string"/>
+                  	<xs:element name="ALEID" form="unqualified" type="xs:string"/>
+                  	<xs:element name="VERSNO" form="unqualified" type="xs:string"/>
+                  	<xs:element name="PGMID" form="unqualified" type="xs:string"/>
+                  	<xs:element name="OBJTYPE" form="unqualified" type="xs:string"/>
                     <xs:element name="OBJNAME" form="unqualified" type="xs:string"/>
                     <xs:element name="SUB_NAME" form="unqualified" type="xs:string"/>
                     <xs:element name="OBJECT_DATA" form="unqualified" type="xs:base64Binary"/>

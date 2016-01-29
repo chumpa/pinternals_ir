@@ -1,12 +1,7 @@
 package com.pinternals.ir;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.RandomAccessFile;
 import java.math.BigInteger;
@@ -26,7 +21,6 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -58,7 +52,7 @@ import com.sun.org.apache.xml.internal.security.utils.Base64;
 enum EScheme {
 	CompareVersions, NotePrintVersion, NoteLastFancyVersion, NoteListForm, NoteStatistic,
 	NoteWUL, NoteAttachment, NoteChangeLog, InternalMemo, SSCR, Pilot,
-	CWB, Nit, DPA, PutDownloadBasket, NoteList,
+	CWB, Nit, DPA, PutDownloadBasket, NoteList, KBA, Corr, 
 	
 	//util
 	ZVersions, ZRoot, UserProfile
@@ -102,7 +96,7 @@ class ParseIndexContext {
 		list = new ArrayList<NoteListItem>(10000);
 		lareas = new ArrayList<Pair<String,String>>(2000);
 		lapps = new ArrayList<Pair<String,String>>(2000);
-		lerrors = new LinkedList<String>();
+		lerrors = new ArrayList<String>();
 	}
 	void addRawError(String field, int diag, String where) {
 		errors++;
@@ -134,10 +128,10 @@ public class Support {
 	HttpClientContext probeUrl() 
 			throws IOException, KeyManagementException, NoSuchAlgorithmException, KeyStoreException, URISyntaxException {
 		String uri = "https://service.sap.com";
-		String app = "/~form/handler?_APP=00200682500000001952&_EVENT=CREATE_SEA";
+		String appSearchNotes = "/~form/handler?_APP=00200682500000001952&_EVENT=CREATE_SEA";
 
         htx = HttpClientContext.create();
-    	HttpGet g = new HttpGet(uri + app);
+    	HttpGet g = new HttpGet(uri + appSearchNotes);
     	CloseableHttpResponse rsp = cl.execute(g, htx);
     	StatusLine l = rsp.getStatusLine();
     	assert l.getStatusCode() == 200 : l;
@@ -147,7 +141,6 @@ public class Support {
 	static void parseList(int mx, Scanner a, ParseIndexContext ctx) throws IOException, ParseException {
 		String p1 = "<TABLE BORDER=\"0\" WIDTH=\"100%\" CELLSPACING=\"0\" CELLPADDING=\"3\">";
 		String p2 = "</TABLE>", std = "</SELECT></TD>", op = "<OPTION VALUE=\"", ope = "</OPTION>";
-		NoteListItem i = null;
 		int st = 0, ln = 0, sx = 0;
 		String x, t;
 
@@ -186,6 +179,7 @@ public class Support {
 
 		while (!a.nextLine().equals("<!------------------- Result ----------------------------->"));
 		if (a.findWithinHorizon(p1, 0)!=null) {
+			NoteListItem i = null;
 			sx = 0;
 			ln = 0;
 			st = 0;
@@ -202,6 +196,7 @@ public class Support {
 					ln = 0;
 					i = new NoteListItem(ctx.lang);
 				} else if (st==3 && x.equals("</TR>")) {
+					assert i!=null;
 					if (i.number!=0) { 
 						ctx.list.add(i);
 						i = null;
@@ -211,6 +206,7 @@ public class Support {
 //					else
 //						System.err.println("parse for note '" + i.title + "' failed");
 				} else if (st==3) {
+					assert i!=null;
 					String zz = "<INPUT TYPE=\"checkbox\" NAME=\"MARK\" VALUE=\"";
 					String zt = "<TD CLASS=\"result-line\" ALIGN=\"right\"><STRONG>";
 					String ze = ".</STRONG></TD>";
@@ -283,6 +279,7 @@ public class Support {
 		if (s!=null && !"".equals(s)) 
 			sDF = (s.split("selected>")[1]).split("<")[0];
 
+		assert s!=null;
 		while(!s.endsWith("Time zone</span>")) {s = a.nextLine().trim();};
 		s = a.nextLine();
 		s = a.nextLine().trim();
@@ -303,7 +300,7 @@ public class Support {
     	CloseableHttpResponse rsp;
     	HttpEntity e;
 		List<String> ae = new ArrayList<String>(10), aj = new ArrayList<String>(10), ad = new ArrayList<String>(10);
-		List<Pair<String,List<String>>> aq = new LinkedList<Pair<String,List<String>>>();
+		List<Pair<String,List<String>>> aq = new ArrayList<Pair<String,List<String>>>();
 		aq.add(new Pair<String,List<String>>("E", ae));
 		aq.add(new Pair<String,List<String>>("D", ad));
 		aq.add(new Pair<String,List<String>>("J", aj));
@@ -337,13 +334,12 @@ public class Support {
 				+ "&00200682500000005063=NO_RES&TEMP_SEARCH=1&NAMESPACE_SEARCH=NO_SEA"
 				+ "&DEFAULT_SEARCH=X";
 		
-		int q;
-		for (q=1; q<=maxpages; q++) {
-			ae.add(String.format(pt, "E", pagesize, q, (q-1)*pagesize, dtto, dtfrom));
+		for (int q=1; q<=maxpages; q++) {
 			ad.add(String.format(pt, "D", pagesize, q, (q-1)*pagesize, dtto, dtfrom));
+			ae.add(String.format(pt, "E", pagesize, q, (q-1)*pagesize, dtto, dtfrom));
 			aj.add(String.format(pt, "J", pagesize, q, (q-1)*pagesize, dtto, dtfrom));
 		}
-		
+
 		Path dir = cache.getTmpDir();
 		Path p2 = Cache.fs.getPath(dir.toString(), "00params.xml");
 		Path xml = Cache.fs.getPath(dir.toString(), String.format("notes_%s--%s.xml", dtfrom, dtto));
@@ -371,7 +367,7 @@ public class Support {
 		for (Pair<String,List<String>> zz: aq) {
 			String lang = zz.getKey();
 			List<String> ax = zz.getValue();
-			q = 1;
+			int q = 1;
 			ctx.lang = lang;
 			for (String x: ax) {
 	        	HttpPost p = new HttpPost(getUrl(htx, EScheme.NoteListForm, lang));
@@ -379,7 +375,7 @@ public class Support {
 	        	rsp = cl.execute(p);
 	        	e = rsp.getEntity();
 	        	Path fp = Cache.fs.getPath(dir.toString(), String.format("notelist_%s_%03d.html", lang, q));
-        		entityToFile(e, fp, lang.equals("J") ? shift_jis : cp1252, utf8);
+	    		Utils.streamToFile(e.getContent(), Files.newOutputStream(fp), lang.equals("J") ? shift_jis : cp1252, utf8);
 	        	ze = new ZipEntry(fp.getFileName().toString());
 	        	zos.putNextEntry(ze);
 	        	IOUtils.copy(Files.newInputStream(fp), zos);
@@ -428,8 +424,11 @@ public class Support {
 //		}
 //		Files.delete(dir); // tmpdir
 	}
-	
-	String noteverscan(Cache cache, String lang, Path f, PrintWriter pw, List<Integer> vers) throws IOException {
+	String noteverscan(Cache cache, 
+			String lang, 
+			Path f, 
+			PrintWriter pw, 
+			List<Integer> vers) throws IOException {
 		Scanner a = new Scanner(f, utf8.name());
 		String p1 = "<span class=\"urImgCbgWhl1\" id=\"version";
 		String p2 = "__keyNotChecked\" value=\"\">";
@@ -474,6 +473,7 @@ public class Support {
 		pw.println("</lang>");
     	pw.flush();
     	vers.sort(Comparator.comparing(x -> x));
+    	assert xsrf!=null;
     	return xsrf;
 	}
 	private static boolean isObjectId(Object x) {
@@ -482,7 +482,7 @@ public class Support {
 	private static boolean isNNumber(Object x) {
 		return (x instanceof Integer) && (int)x<9999999 & (int)x>0;
 	}
-	static URI getUrl(HttpClientContext htx, EScheme e, String lang, Object ... args) throws URISyntaxException {
+	private static URI getUrl(HttpClientContext htx, EScheme e, String lang, Object ... args) throws URISyntaxException {
 		String host = htx.getTargetHost().toString(), x, y;
 		URI u = null;
 		switch (e) {
@@ -606,21 +606,6 @@ public class Support {
 ////		}
 //	}
 
-//	private static List<String> genURL(int pagesize, int pagesMaxToList, String dtfrom, String dtto, String lang) {
-//		assert lang!=null;
-//		List<String> a = new ArrayList<String>(pagesize);
-//		for (int i=1; i<=pagesMaxToList; i++) 
-//			a.add("_NNUM=&00200682500000004876=&00200682500000004915=AND&00200682500000004916=ALL&00200682500000005447=L&SEARCH_AREA=&"
-//				+ "00200682500000005040=NO_RESTRICTION&00200682500000004918=" + pagesize + "&_APP=00200682500000001952&_EVENT=RESULT&00200682500000004875=&"
-//				+ "00200682500000004932=" + i + "&00200682500000004919=" + (i-1)*pagesize + "&00200682500000005464=FALSE"
-//				+ "&00200682500000005466=TRUE&00200682500000005465=TRUE&00200682500000005467=TRUE&00200682500000005468=TRUE&00200682500000005462=HEAD_FRGTS&00200682500000005463=0"
-//				+ "&00200682500000002804=&00200682500000002805=&00200682500000002076=&00200682500000000719=OW2&00200682500000002070=&00200682500000004920=&00200682500000004877=12346&00200682500000004878=0022&00200682500000004879=ABCDEFGHIKMOPRTUWXY&00200682500000005448=NO"
-//				+ "&00200682500000001280=USER&00200682500000001274=" + dtto + "&00200682500000001276=" + dtfrom + "&01100107900000000030=&00200682500000005063=NO_RES&TEMP_SEARCH=1&NAMESPACE_SEARCH=NO_SEA"
-//				+ "&00200682500000004914=" + lang 
-//				+ "&DEFAULT_SEARCH=X");
-//		return a;
-//	}
-	
 	// <TD CLASS="numberofnotes"><H3 CLASS="note">%d SAP Notes found</H3></TD>
     // <TD CLASS="numberofpages">Page 1 of 1</TD>
 	class S2 {
@@ -633,9 +618,6 @@ public class Support {
 		
 		int pagecur, pagesall, notesfound;
 		S2(RandomAccessFile f) throws IOException {
-//			int q = 30000;
-//			f.seek(q);	// any trash
-//			byte[] b = new byte[Math.max(100000, (int) (f.length() - q))];
 			byte[] b = new byte[(int) f.length()];
 			f.readFully(b);
 			String x = new String(b);
@@ -672,142 +654,8 @@ public class Support {
 		}
 	}
 
-	void notever(CloseableHttpClient cl, HttpClientContext htx
-			, Cache cache, int number, String objid, boolean easy, boolean askextra) 
-			throws IOException, URISyntaxException {
-		assert number > 0;
-		
-//		HttpGet get;
-//		Path csEn = cache.getPathByScheme(EScheme.CompareVersions, number, "E");
-//		Path csDe = cache.getPathByScheme(EScheme.CompareVersions, number, "D");
-//    	Path versions = cache.getPathByScheme(EScheme.ZVersions, number, null);
-
-//		if (objid==null || "".equals(objid)) {
-//			Scanner a;
-//			Pattern pt;
-//			String q;
-//			int j="002007204200000280162010".length();
-//			if (Files.isRegularFile(versions)) {
-//				a = new Scanner(versions);
-//				pt = Pattern.compile("objid=.([0-9]{"+j+"})");
-//				while (a.hasNextLine()) {
-//					q = a.findWithinHorizon(pt, 100000);
-//					if (q!=null) {
-//						objid = new String(q.substring(q.length()-j, q.length()));
-//						break;
-//					}
-//				}
-//				a.close();
-//			} else {
-//				pt = Pattern.compile("/sap/support/notes/statistic/reads.htm\\?iv_key=([0-9]{"+j+"})");
-//				Path dir = cache.getPathByScheme(EScheme.ZRoot, number, null);
-//				DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "*_fancy_?.html");
-//				Iterator<Path> it = ds.iterator();
-//				q = null;
-//				while (it.hasNext()) {
-//					a = new Scanner(it.next(), utf8.name());
-//					q = a.findWithinHorizon(pt, 100000);
-//					if (q!=null) objid = new String(q.substring(q.length()-j, q.length()));
-//					a.close();
-//				}
-//				if (objid==null||"".equals(objid)) {
-//					Path latestFancy = cache.getPathByScheme(EScheme.NoteLastFancyVersion, number, "E", 0);
-//					get = new HttpGet(getUrl(htx, EScheme.NoteLastFancyVersion, "E", number));
-//					entityToFile(cl.execute(get).getEntity(), latestFancy, cp1252, utf8);
-//					a = new Scanner(latestFancy);
-//					q = a.findWithinHorizon(pt, 100000);
-//					if (q!=null) objid = new String(q.substring(q.length()-j, q.length()));
-//					a.close();
-//				}
-//			}
-//		}
-//		assert objid!=null && !"".equals(objid);
-//		
-//		if (easy && Files.isRegularFile(versions)) return;
-//		
-//    	get = new HttpGet(getUrl(htx, EScheme.CompareVersions, "E", objid));
-//    	entityToFile(cl.execute(get).getEntity(), csEn, cp1252, utf8);
-//
-//    	get = new HttpGet(getUrl(htx, EScheme.CompareVersions, "D", objid));
-//    	entityToFile(cl.execute(get).getEntity(), csDe, cp1252, utf8);
-//
-//    	PrintWriter pw = new PrintWriter(Files.newBufferedWriter(versions, utf8));
-//    	pw.println("<?xml version='1.1' encoding='" + utf8.name() + "' standalone='yes'?>");
-//    	pw.println("<version note='" + number +"' objid='" + objid + "'>");
-//    	pw.flush();
-//    	
-//    	List<Integer> versE = new ArrayList<Integer>(10), versD = new ArrayList<Integer>(10);
-//    	String xsrfE, xsrfD;
-//    	xsrfE = noteverscan(cache, "E", csEn, pw, versE);
-//    	xsrfD = noteverscan(cache, "D", csDe, pw, versD);
-//    	pw.print("</version>");
-//    	pw.close();
-//    	
-//    	assert xsrfE.equals(xsrfD);
-//    	assert versE.size()>0 || versD.size()>0 : "Either [E] or [D] have to had versions";
-//
-//    	boolean aE = false, aD = false;
-//    	if (versE.size()>0) aE = noteverDeep(cache, cl, htx, "E", number, objid, versE);
-//    	if (versD.size()>0) aD = noteverDeep(cache, cl, htx, "D", number, objid, versD);
-//
-//    	Path changelog = cache.getPathByScheme(EScheme.NoteChangeLog, number, null);
-//    	Path intMemo = cache.getPathByScheme(EScheme.InternalMemo, number, null);
-//    	if (aE||aD) {
-//    		get = new HttpGet(getUrl(htx, EScheme.NoteChangeLog, null, objid));
-//	    	entityToFile(cl.execute(get).getEntity(), changelog, cp1252, utf8);
-//
-//    		get = new HttpGet(getUrl(htx, EScheme.InternalMemo, null, objid));
-//	    	entityToFile(cl.execute(get).getEntity(), intMemo, cp1252, utf8);
-//    	} else 
-//    		assert Files.isRegularFile(changelog) && Files.isRegularFile(intMemo);
-    	
-//    	if (askextra && (aE||aD)) {
-//	    	File f = new File(dir, "pilot.html");
-//	    	rsp = cl.execute(new HttpGet(getUrl(htx, EScheme.Pilot, null, number)));
-//	    	e = rsp.getEntity();
-//	    	entityToFile(e.getContent(), new FileOutputStream(f), fromCs, toCs);
-//	
-//	    	f = new File(dir, "cwb.html");
-//	    	rsp = cl.execute(new HttpGet(getUrl(htx, EScheme.CWB, null, number)));
-//	    	e = rsp.getEntity();
-//	    	entityToFile(e.getContent(), new FileOutputStream(f), fromCs, toCs);
-//	
-//	    	f = new File(dir, "nit.html");
-//	    	rsp = cl.execute(new HttpGet(getUrl(htx, EScheme.Nit, null, number)));
-//	    	e = rsp.getEntity();
-//	    	entityToFile(e.getContent(), new FileOutputStream(f), fromCs, toCs);
-//	
-//	    	f = new File(dir, "dpa.html");
-//	    	rsp = cl.execute(new HttpGet(getUrl(htx, EScheme.DPA, null, number, getTst() )));
-//	    	e = rsp.getEntity();
-//	    	entityToFile(e.getContent(), new FileOutputStream(f), fromCs, toCs);
-//    	}
-	}
-
-	
-	void entityToFile(HttpEntity e, Path fos, Charset from, Charset to) throws IOException {
-		entityToFile(e.getContent(), Files.newOutputStream(fos), from, to);
-	}
-
-	void entityToFile(InputStream is, OutputStream fos, Charset from, Charset to) throws IOException {
-    	BufferedReader br = new BufferedReader(new InputStreamReader(is, from));
-    	BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos, to));
-    	
-    	if (to.name().equals(NotesRetriever.utf8.name())) {	// add BOM utf-8
-	    	fos.write(0xEF);
-	    	fos.write(0xBB);
-	    	fos.write(0xBF);
-    	}
-    	char[] cb = new char[65536];
-    	int i = br.read(cb);
-    	while (i>0) {
-    		bw.write(cb, 0, i);
-    		i = br.read(cb);
-    		bw.flush();
-    	}
-    	bw.close();
-    	fos.close();
-    	br.close();
+	void close() {
+		//TODO close Http connections
 	}
 	static void cache(Cache cache, NotesDB db) throws IOException, SQLException {
 		Iterator<Path> it = cache.getSupportSapComNotesZip();
@@ -855,43 +703,46 @@ public class Support {
 //		System.out.println(zd);
 	}
 	
-	void zZz(Cache cache, String dtfrom, String dtto) 
+	void zZz(Cache cache, String dtfrom, String dtto, boolean cmd) 
 			throws KeyManagementException, NoSuchAlgorithmException, KeyStoreException, IOException, URISyntaxException, ParseException {
 		DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyyMMdd");
 		LocalDate b = LocalDate.parse("19900101", dtf), t, tm = LocalDate.now();
 		Iterator<Path> it = cache.getSupportSapComNotesZip();
 		int ps = 5000, mx = 1000000;
-		if (dtfrom!=null && dtto!=null) { 
+		if (dtfrom!=null && dtto!=null && !cmd) { 
 			probeUrl();
 			getParseUserProfile();
 			iter(cache, ps, mx/ps, dtfrom, dtto);
-		} else {
-			List<String> z = new ArrayList<String>();
-			while (it.hasNext()) {
-				Path q = it.next();
-				LocalDate from =  LocalDate.parse(q.getFileName().toString().substring(6,14), dtf);
-				LocalDate to =  LocalDate.parse(q.getFileName().toString().substring(16,24), dtf);
-				while (!b.isEqual(from) && b.isBefore(from)) {
-					t = b.plusMonths(1);
-					z.add(dtf.format(b));
-					z.add(dtf.format(t));
-					b = t;
-				}
-				b = to;
-			}
-			while (b.isBefore(tm)) {
+			return;
+		} 
+		List<String> z = new ArrayList<String>();
+		while (it.hasNext()) {
+			Path q = it.next();
+			LocalDate from =  LocalDate.parse(q.getFileName().toString().substring(6,14), dtf);
+			LocalDate to =  LocalDate.parse(q.getFileName().toString().substring(16,24), dtf);
+			while (!b.isEqual(from) && b.isBefore(from)) {
 				t = b.plusMonths(1);
 				z.add(dtf.format(b));
 				z.add(dtf.format(t));
 				b = t;
 			}
-			if (z.size()>0) {
-				probeUrl();
-				getParseUserProfile();
-				for (int i=0; i<z.size(); i+=2) {
-					iter(cache, ps, mx/ps, z.get(i), z.get(i+1));
-				}
-			}
+			b = to;
+		}
+		while (b.isBefore(tm)) {
+			t = b.plusMonths(1);
+			z.add(dtf.format(b));
+			z.add(dtf.format(t));
+			b = t;
+		}
+		if (z.size()==0) return;
+		if (!cmd) {
+			probeUrl();
+			getParseUserProfile();
+			for (int i=0; i<z.size(); i+=2) 
+				iter(cache, ps, mx/ps, z.get(i), z.get(i+1));
+		} else {
+			for (int i=0; i<z.size(); i+=2)
+				System.out.println(String.format("call online.bat GETLIST %s %s", z.get(i), z.get(i+1)));
 		}
 	}
 
@@ -942,3 +793,22 @@ public class Support {
 //https://smpdl.sap-ag.de/~swdc/012002523100020457252015E/CDLABEL.htm?_ACTION=CONTENT_INFO
 //
 //
+//static URL getNoteURL(String number, String mode) throws MalformedURLException {
+//// что-то вроде https://service.sap.com/sap/bc/bsp/sno/ui_entry/entry.htm?param=69765F6D6F64653D3030312669765F7361706E6F7465735F6E756D6265723D3232353338343926
+//String c = "https://service.sap.com/sap/bc/bsp/sno/ui_entry/entry.htm";
+//String p = "?param=";
+//String v = "iv_mode=" + mode + "&iv_sapnotes_number=" + number;
+//String w =  DatatypeConverter.printHexBinary(v.getBytes());
+//URL u = new URL(c+p+w);
+//return u;
+//}
+//static URL getNotePdfURL() {
+//// https://websmp130.sap-ag.de/sap/support/notes/convert2pdf/0002253849?sap-language=EN
+//return null;
+//}
+
+//static URL getNoteStatistic(String key) throws MalformedURLException {
+//// key is like 012006153200001854902015
+//String c = "https://service.sap.com/sap/support/notes/statistic/reads.htm?iv_key=" + key;
+//return new URL(c);
+//}

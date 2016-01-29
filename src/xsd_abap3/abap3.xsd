@@ -45,9 +45,9 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="INSTA" type="xs:integer"/>
-  <xs:element name="PAKID" type="xs:integer"/>
-  <xs:element name="ALEID" type="xs:integer"/>
+  <xs:element name="INSTA" type="xs:string"/>
+  <xs:element name="PAKID" type="xs:string"/>
+  <xs:element name="ALEID" type="xs:string"/>
   <xs:element name="DELTAS">
     <xs:complexType>
       <xs:sequence>
@@ -86,7 +86,7 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="LINNO" type="xs:integer"/>
+  <xs:element name="LINNO" type="xs:string"/>
   <xs:element name="CONTEXT">
     <xs:complexType>
       <xs:sequence>
@@ -133,9 +133,9 @@
     </xs:complexType>
   </xs:element>
   <xs:element name="STOKEN_--2DSTR" type="xs:string"/>
-  <xs:element name="VERSNO" type="xs:integer"/>
-  <xs:element name="PGMID" type="xs:NCName"/>
-  <xs:element name="OBJTYPE" type="xs:NCName"/>
+  <xs:element name="VERSNO" type="xs:string"/>
+  <xs:element name="PGMID" type="xs:string"/>
+  <xs:element name="OBJTYPE" type="xs:string"/>
   <xs:element name="OBJNAME" type="xs:string"/>
   <xs:element name="DESTINATION" type="xs:string"/>
 </xs:schema>

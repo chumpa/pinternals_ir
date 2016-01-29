@@ -1,8 +1,8 @@
 package com.pinternals.ir;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -19,7 +19,8 @@ import javafx.util.Pair;
 import org.apache.commons.lang3.StringEscapeUtils;
 
 public class Cache {
-	static FileSystem fs = FileSystems.getDefault();
+	public static final Charset utf8 = NotesRetriever.utf8;
+	public static final FileSystem fs = FileSystems.getDefault();
 	Map<Integer,Path> cacheRawVer = new HashMap<Integer,Path>();
 	Path root, supportSapComNotes, notesdb, launchpad;
 
@@ -27,13 +28,13 @@ public class Cache {
 		root = fs.getPath(d);
 		assert Files.isDirectory(root);
 		
-		notesdb = fs.getPath(d, "notes.db");
+		notesdb = root.resolve("notes.db");
 		assert Files.isRegularFile(notesdb) : "notes.db isn't exist";
 		
-		supportSapComNotes = fs.getPath(d, "support-sap-com-notes");
+		supportSapComNotes = root.resolve("support-sap-com-notes");
 		if (!Files.exists(supportSapComNotes)) Files.createDirectory(supportSapComNotes);
 
-		launchpad = fs.getPath(d, "launchpad");
+		launchpad = root.resolve("launchpad");
 		if (!Files.exists(launchpad)) Files.createDirectory(launchpad);
 	}
 	Iterator<Path> getSupportSapComNotesZip() throws IOException {
@@ -41,6 +42,10 @@ public class Cache {
 				"notes_[1-2][0-9][0-9][0-9][0-9][0-9][0-9][0-9]--[1-2][0-9][0-9][0-9][0-9][0-9][0-9][0-9].zip");
 		return ex.iterator();
 	}
+	Path getLaunchpadArealist() throws IOException {
+		return launchpad.resolve("arealist.txt");
+	}
+
 //	List<Pair<Character,Path>> getRawFiles(boolean onlyupdated) throws IOException {
 //		List<Pair<Character,Path>> z = filterRawFiles(rawdir);
 //		if (!onlyupdated) return z;
@@ -65,9 +70,8 @@ public class Cache {
 		return p;
 	}
 	void storeXml(ParseIndexContext ctx, Path xml) throws IOException {
-		File f = xml.toFile();
-		f.createNewFile();
-		PrintWriter p = new PrintWriter(f, NotesRetriever.utf8.name());
+		Files.createFile(xml);
+		PrintWriter p = new PrintWriter(Files.newBufferedWriter(xml, utf8));
 		p.print("<?xml version='1.1' encoding='" + NotesRetriever.utf8.name() + "'?><snotes>");
 
 		ctx.list.sort(Comparator.comparing(o1 -> o1.number ));
@@ -88,7 +92,6 @@ public class Cache {
 			p.print("\n<area rcode='"+a.getKey()+"' value='" + a.getValue() +"'/>");
 		}
 		p.flush();
-		
 //		p.print("\n<!-- [Statistics]");
 //		if (dsd==0 && dod==0) {
 //			p.print("\tNotes collected: " + q + ", no duplicates found");
