@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" xmlns:metadata="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
+  <xs:element name="error">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="metadata:code"/>
+        <xs:element ref="metadata:message"/>
+        <xs:element ref="metadata:innererror"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="innererror">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="metadata:transactionid"/>
+        <xs:element ref="metadata:timestamp"/>
+        <xs:element ref="metadata:Error_Resolution"/>
+        <xs:element ref="metadata:errordetails"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="transactionid" type="xs:string"/>
+  <xs:element name="timestamp">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="Error_Resolution">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="metadata:SAP_Transaction"/>
+        <xs:element ref="metadata:SAP_Note"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="SAP_Transaction">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="SAP_Note">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="errordetails">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="metadata:errordetail"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="errordetail">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="metadata:code"/>
+        <xs:element ref="metadata:message"/>
+        <xs:element ref="metadata:propertyref"/>
+        <xs:element ref="metadata:severity"/>
+        <xs:element ref="metadata:target"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="propertyref">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="severity" type="xs:string"/>
+  <xs:element name="target">
+    <xs:complexType/>
+  </xs:element>
+  <xs:element name="code" type="xs:string"/>
+  <xs:element name="message">
+    <xs:complexType mixed="true">
+      <xs:attribute ref="xml:lang"/>
+    </xs:complexType>
+  </xs:element>
+</xs:schema>
