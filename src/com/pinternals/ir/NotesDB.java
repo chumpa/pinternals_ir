@@ -6,14 +6,15 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.text.ParseException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
 
@@ -22,6 +23,7 @@ import org.apache.commons.lang3.StringEscapeUtils;
 import com.sap.JaxbNote;
 import com.sap.Properties;
 import com.sap.Snotes;
+
 
 enum EPrio {
 	Recommend, Normal, HotNews, CorrLow, CorrMedium, CorrHigh;
@@ -72,6 +74,7 @@ enum ECat {
 
 class Area {
 	static Map<String,Integer> areaToCode = new HashMap<String,Integer>();
+	static Map<Integer,String> codeToArea = new HashMap<Integer,String>();
 	static Map<String,String> areaToDescr = new HashMap<String,String>();
 	static Map<String,Set<String>> nickToArea = new HashMap<String,Set<String>>();
 	private static Set<String> zz2 = new HashSet<String>();
@@ -90,6 +93,7 @@ class Area {
 		while (rs.next()) {
 			areaToCode.put(rs.getString(1), rs.getInt(2));
 			areaToDescr.put(rs.getString(1), rs.getString(3));
+			codeToArea.put(rs.getInt(2), rs.getString(1));
 		}
 		rs.close();
 	}
@@ -130,6 +134,14 @@ class Area {
 			aa02 = true;
 		}
 	}
+	static void addForNick(String nick, String area) {
+		assert nick!=null && !"".equals(nick);
+		assert area!=null && !"".equals(area);
+		Set<String> s = nickToArea.get(nick);
+		if (s==null) s = new HashSet<String>();
+		s.add(area);
+		nickToArea.put(nick, s);
+	}
 	static void updateLaunchpad() throws SQLException {
 		boolean x = aa02;
 		int ia[];
@@ -154,16 +166,21 @@ class Area {
 }
 
 public class NotesDB {
-	private static final int SAP_KBA=1, SAP_UNKNOWNYET=0;
 	private static ResourceBundle ddlrb = ResourceBundle.getBundle("com/pinternals/ir/ddl");
 	private static ResourceBundle sqlrb = ResourceBundle.getBundle("com/pinternals/ir/sql");
+//	(0, 'SAP UnknownYet'), \
+//	(1, 'SAP Knowledge Base Article'), \
+//	(2, 'SAP Note'),\
+//	(3, 'SAP Security Note');\
+	public static final int SAP_UNKNOWNYET=0, SAP_KBA=1, SAP_NOTE=2, SAP_SECNOTE=3;
+	static Map<String,Integer> types = new HashMap<String,Integer>();
 
 	private Connection con = null;
 	boolean dba = false;
 	private int eu, ia[];	// for asserts
-	private Map<String,Integer> areaAreas = null;	// for DBA only
+//	private Map<String,Integer> areaAreas = null;	// for DBA only
 	Path pathdb = null;
-	
+
 	/**
 	 * look for sql.properties
 	 * @param code
@@ -212,11 +229,6 @@ public class NotesDB {
 		return ndb;
 	}	
 
-	static NotesDB openDBA(Path db) throws SQLException {
-		NotesDB ndb = new NotesDB(db, false, true);
-		ndb.con.commit();
-		return ndb;
-	}	
 	
 	NotesDB(Path pat, boolean checksql, boolean isdba) throws SQLException {
 		this.pathdb = pat;
@@ -228,6 +240,7 @@ public class NotesDB {
 		con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + pat.toFile());
 		con.setAutoCommit(false);
 		if (checksql) for (String s: sqlrb.keySet()) sql(s);	// is statement compilable ?
+		if (!isdba) pairToMap3(sql("01types"), types);
 		this.dba = isdba;
 	}
 
@@ -269,7 +282,6 @@ public class NotesDB {
 	private PreparedStatement zzz2=null, zy2=null, zy3=null, fcupd=null, fcins=null;
 	Map<String,Integer> prio = new HashMap<String,Integer>();
 	Map<String,Integer> cat = new HashMap<String,Integer>();
-	Map<String,Integer> types = new HashMap<String,Integer>();
 	Set<String> zz2 = new HashSet<String>();
 	void walk22(Snotes sn, boolean isnew, String fname, String lastmod) throws SQLException, IOException {
 		if (sn==null) {
@@ -365,56 +377,96 @@ public class NotesDB {
 		con.commit();
 	} // void walk22(Iterator<Path> it);
 
-	List<AZ> getZ3(String area) throws SQLException, ParseException {
-		List<AZ> az = new ArrayList<AZ>(1000);
-		PreparedStatement ps = sql("w07");
-		ps.setString(1, area);
-		ResultSet rs = ps.executeQuery();
-		while (rs.next()) {
-			int num = rs.getInt(1);
-			String j = rs.getString(2);
-			az.add(new AZ(num, j, area));
+	/**
+	 * Ask central database for all notes by areas
+	 * @param collection of areas (ex: BC-XI, BC-JAS-SEC-CON, ...)
+	 * @return 
+	 * @throws SQLException
+	 */
+	List<AZ> getNotesCDB_byAreas(Collection<String> as) throws SQLException {
+		PreparedStatement cl = sql("w08a"), ps = sql("w08b");
+		cl.executeUpdate();
+		for (String a: as) {
+			ps.setInt(1, Area.getCode(a));
+			ps.addBatch();
 		}
-		ps.close();
+		ps.executeBatch();
+//		commit();
+		ps = sql("w08c");
+		ResultSet rs = ps.executeQuery();
+		List<AZ> az = new ArrayList<AZ>(1000);
+		while (rs.next()) {
+			String area = Area.codeToArea.get(rs.getInt(3));
+			assert area!=null && as.contains(area);
+			AZ z = new AZ(rs.getInt(1), area, rs.getString(2), rs.getInt(4));
+			az.add(z);
+		}
+		cl.executeUpdate();
+		commit();
 		return az;
+		
 	}
 	
-	void getZ3a(List<AZ> azl) throws SQLException {
-		PreparedStatement ps = con.prepareStatement("select askdate,NotesKey,"
-				+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language from a01 where NotesNumber=?;");
-		ResultSet rs;
-		for (AZ az: azl) {
-			ps.setInt(1, az.num);
-			rs = ps.executeQuery();
-			while (rs.next()) {
-				com.sap.Properties p = new Properties();
-				p.setSapNotesNumber(String.valueOf(az.num));
-				p.setSapNotesKey(rs.getString(2));
-				p.setTitle(rs.getString(3));
-				p.setType(rs.getString(4));
-				p.setVersion(rs.getString(5));
-				p.setPriority(rs.getString(6));
-				p.setCategory(rs.getString(7));
-				p.setReleasedOn(rs.getString(8));
-				p.setComponentKey(rs.getString(9));
-				p.setComponentText(rs.getString(10));
-				p.setLanguage(rs.getString(11));
-				az.foundA(rs.getString(1), p);
-			}
-		}
-	}
+//	List<AZ> getZ3(String area) throws SQLException {
+//		List<AZ> az = new ArrayList<AZ>(1000);
+//		PreparedStatement ps = sql("w07");
+//		ps.setString(1, area);
+//		ResultSet rs = ps.executeQuery();
+//		while (rs.next()) {
+//			int num = rs.getInt(1);
+//			String j = rs.getString(2);
+//			az.add(new AZ(num, j, area));
+//		}
+//		ps.close();
+//		return az;
+//	}
+	
+//	@Deprecated
+//	void getZ3a(List<AZ> azl) throws SQLException {
+//		PreparedStatement ps = con.prepareStatement("select askdate,NotesKey,"
+//				+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language from a01 where NotesNumber=?;");
+//		ResultSet rs;
+//		for (AZ az: azl) {
+//			ps.setInt(1, az.num);
+//			rs = ps.executeQuery();
+//			while (rs.next()) {
+//				com.sap.Properties p = new Properties();
+//				p.setSapNotesNumber(String.valueOf(az.num));
+//				p.setSapNotesKey(rs.getString(2));
+//				p.setTitle(rs.getString(3));
+//				p.setType(rs.getString(4));
+//				p.setVersion(rs.getString(5));
+//				p.setPriority(rs.getString(6));
+//				p.setCategory(rs.getString(7));
+//				p.setReleasedOn(rs.getString(8));
+//				p.setComponentKey(rs.getString(9));
+//				p.setComponentText(rs.getString(10));
+//				p.setLanguage(rs.getString(11));
+//				az.foundA(rs.getString(1), p);
+//			}
+//		}
+//	}
 
 	PreparedStatement ps3b = null;
+	/**
+	 * 
+	 * @return
+	 * @throws SQLException
+	 */
 	List<AZ> getZ3b() throws SQLException {
+		assert dba && !isClosed();
 		List<AZ> azl = new ArrayList<AZ>(10000);
 		if (ps3b==null) ps3b = con.prepareStatement("select askdate,NotesKey,"
 				+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language,NotesNumber, "
 				+ "(select count(*) from LongText t where t.NotesNumber=a.NotesNumber and t.Language=a.Language and t.Version=a.Version) longtexts"
 				+ " from a01 a;");
+		assert types!=null && types.size()>0 : "note types aren't filled /" + types;
 		ResultSet rs;
 		rs = ps3b.executeQuery();
 		while (rs.next()) {
-			AZ az = new AZ(rs.getInt(12), rs.getString(9), rs.getString(2));
+			Integer tp = types.get(rs.getString(4));
+			Objects.requireNonNull(tp, String.format("'%s' not mapped to mark", rs.getString(4)));
+			AZ az = new AZ(rs.getInt(12), rs.getString(9), rs.getString(2), tp);
 			com.sap.Properties p = new Properties();
 			p.setSapNotesNumber(String.valueOf(rs.getInt(12)));
 			p.setSapNotesKey(rs.getString(2));
@@ -427,9 +479,8 @@ public class NotesDB {
 			p.setComponentKey(rs.getString(9));
 			p.setComponentText(rs.getString(10));
 			p.setLanguage(rs.getString(11));
-			az.foundA(rs.getString(1), p);
+//			az.foundA(rs.getString(1), p);
 			az.longTexts = rs.getInt(13);
-			
 			azl.add(az);
 		}
 		return azl;
@@ -437,6 +488,7 @@ public class NotesDB {
 
 	PreparedStatement psPut = null;
 	void put(Properties p, Instant n) throws SQLException {
+		assert dba && !isClosed();
 		if (psPut==null) psPut = con.prepareStatement("insert into a01(askdate,NotesNumber,NotesKey,"
 			+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language) values (?,?,?,?,?,?,?,?,?,?,?,?);");
 		String askdate = n.toString();
@@ -482,7 +534,6 @@ public class NotesDB {
 		ResultSet rx = px.executeQuery(), rs;
 		pairToMap3(sql("01prioget2"), prio);
 		pairToMap3(sql("01catget2"), cat);
-		pairToMap3(sql("01types"), types);
 		Area.init(this);
 		Area.reload();
 		
@@ -632,12 +683,12 @@ public class NotesDB {
 	 * @param area	like BC-XI-CON-AFW-SEC or FI-AA
 	 * @param code	dynamic integer
 	 */
-	void addArea(String area, int code) {
-		assert dba;
-		if (areaAreas==null) areaAreas = new HashMap<String,Integer>();
-		// TODO assert for code differences for one area (look into Area)  
-		areaAreas.put(area, code);
-	}
+//	void addArea(String area, int code) {
+//		assert dba;
+//		if (areaAreas==null) areaAreas = new HashMap<String,Integer>();
+//		// TODO assert for code differences for one area (look into Area)  
+//		areaAreas.put(area, code);
+//	}
 
 	/**
 	 * Mutual synchronization of central notes.db and many of <area>.db

@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -52,7 +53,10 @@ import com.sun.org.apache.xml.internal.security.utils.Base64;
 enum EScheme {
 	CompareVersions, NotePrintVersion, NoteLastFancyVersion, NoteListForm, NoteStatistic,
 	NoteWUL, NoteAttachment, NoteChangeLog, InternalMemo, SSCR, Pilot,
-	CWB, Nit, DPA, PutDownloadBasket, NoteList, KBA, Corr, 
+	CWB, Nit, DPA, PutDownloadBasket, NoteList, 
+	
+	//
+	KBA, Corr, 
 	
 	//util
 	ZVersions, ZRoot, UserProfile
@@ -258,7 +262,7 @@ public class Support {
 				}
 			}
 		} else {
-			throw new RuntimeException("No notes at all");
+			System.err.println(String.format("%n%nNo notes at all for language %s, daterange s-s%n%n", ctx.lang));
 		}
 		return;
 	}
@@ -357,7 +361,7 @@ public class Support {
 		if ("YYYY-MM-DD".equals(sDF))
 			dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 		else
-			assert false;
+			assert false : "Date mask " + sDF + " is not implemented yet";
 		ParseIndexContext ctx = new ParseIndexContext(dtf, "E");
 
 		ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(ar), utf8);

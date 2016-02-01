@@ -168,12 +168,12 @@ public class NotesRetriever {
 					break;
 				case "LPAD.GETNOTES":
 					System.out.println("Online launchpad.support.sap.com for " + uname);
-					l = new Launchpad(cache);
+					l = new Launchpad(cache, uname, prHost, prCred);
 					l.areaList(db);
 					for (NotesDB dba: l.dbas) {
 						String nick = dba.getNick();
 						if (as==1 || args.contains(nick)) {
-							l.getNotes(db, dba);
+							l.getNotes(db, dba, true);
 							args.remove(nick);
 						} else {
 							System.err.println(String.format("warn: %s not used", nick));

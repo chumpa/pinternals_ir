@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -44,6 +45,7 @@ import com.gargoylesoftware.htmlunit.BrowserVersion;
 import com.gargoylesoftware.htmlunit.IncorrectnessListener;
 import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.Page;
+import com.gargoylesoftware.htmlunit.SgmlPage;
 import com.gargoylesoftware.htmlunit.SilentCssErrorHandler;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebResponse;
@@ -114,11 +116,6 @@ class NoteA {
 	public String toString() {
 		String s = String.format("%d.%d [%s %s]", num, versionAsked, hdTHEMK, titles.get("E"));
 		return s;
-	}
-	@Deprecated
-	static boolean as(Object o) {
-		if ((o instanceof String) && (o==null || o.equals(""))) return true;
-		return false;
 	}
 	/**
 	 * Parse downloaded from launchpad.support.sap.com zip-file
@@ -307,35 +304,111 @@ class NoteA {
 	}
 }
 
-//az
 class AZ{
-	boolean kba = false, secnote = false;
-	int num, longTexts = 0;
-	String area, askdate = null, objid=null;
-	com.sap.Properties prop;
+	int num, mark, longTexts=0;
+	String area, askdate=null, objid=null;
+	com.sap.Properties prop=null;
+	
+	@Override
 	public String toString() {
 		return String.valueOf(num);
 	}
-	boolean foundA = false;
-	void foundA(String askdate, com.sap.Properties p) {
-		prop = p;
-		foundA = true;
-		this.askdate = askdate;
-		this.kba = p.getType().equals("SAP Knowledge Base Article");
-		this.secnote = p.getType().equals("SAP Security Note");
-	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		assert obj!=null && obj instanceof AZ;
+		return num==((AZ)obj).num;
+	};
+	
+//	boolean foundA = false;
+//	void foundA(String askdate, com.sap.Properties p) {
+//		prop = p;
+//		foundA = true;
+//		this.askdate = askdate;
+////		this.kba = p.getType().equals("SAP Knowledge Base Article");
+////		this.secnote = p.getType().equals("SAP Security Note");
+//	}
 	/**
-	 * constructor from DB
+	 * constructor from CDB, DBA
 	 * @param num
 	 * @param area
 	 * @param obj
 	 */
-	AZ(int num, String area, String obj) {
+	AZ(int num, String area, String obj, int mark) {
+		assert num>0;
+		assert mark>=0;
+		assert area!=null && obj!=null;
 		this.num = num;
 		this.objid = obj;
 		this.area = area;
+		this.mark = mark;
 	}
 
+	/**
+	 * downloads main entry, with no feeds
+	 * @param wc
+	 * @param debug
+	 * @throws IOException
+	 */
+	static Entry downloadEntry(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException {
+    	Path ph = Cache.fs.getPath(String.format("errorEntry_%010d.html", num));
+		URL u = null;
+		if (mark==NotesDB.SAP_KBA) {
+			u = Launchpad.getByScheme(EScheme.KBA, lang, num, ver);
+		} else {
+			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver);
+		}
+		Page o = wc.getPage(u);
+		WebResponse wr = o.getWebResponse();
+		int rc = wr.getStatusCode();
+		Entry en;
+		if (rc>399) {
+	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+	    	// check if note is not released yet
+	    	com.sap.err.Error er = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
+			throw new RuntimeException(String.format("Failed (rc=%d) to get %s, look at %s", rc, u, ph));
+		} else if (debug) {
+			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry.xml", num, lang, ver));
+			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+			en = JAXB.unmarshal(Files.newInputStream(ph), Entry.class);
+		} else {
+			en = JAXB.unmarshal(wr.getContentAsStream(), Entry.class);
+		}
+		return en;
+	}
+	
+	/**
+	 * downloads main entry, with no feeds
+	 * @param wc
+	 * @param debug
+	 * @throws IOException
+	 */
+	static Feed downloadFeeds(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ... args) throws IOException {
+    	Path ph = Cache.fs.getPath(String.format("errorFeeds_%010d.html", num));
+		URL u = null;
+		if (mark==NotesDB.SAP_KBA) {
+			u = Launchpad.getByScheme(EScheme.KBA, lang, num, ver, args);
+		} else {
+			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver, args);
+		}
+		Page o = wc.getPage(u);
+		WebResponse wr = o.getWebResponse();
+		int rc = wr.getStatusCode();
+		Feed fd;
+		if (rc>399) {
+	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+	    	// try if note is not released yet
+			throw new RuntimeException(String.format("Failed (rc=%d) to get %s, look at %s", rc, u, ph));
+		} else if (debug) {
+			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_feed.xml", num, lang, ver));
+			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+			fd = JAXB.unmarshal(Files.newInputStream(ph), Feed.class);
+		} else {
+			fd = JAXB.unmarshal(wr.getContentAsStream(), Feed.class);
+		}
+		return fd;
+	}
+	
 	// ------------------------------------------------------------	
 	//	String ;
 	//	String areadescr, dateS, lang, , objid2=null;
@@ -432,18 +505,19 @@ public class Launchpad {
 			dx = p.resolve(nick+".db");
 
 			NotesDB dba = null;
-			if (Files.isRegularFile(dx)) 
-				dba = NotesDB.openDBA(dx);
+			if (Files.isRegularFile(dx))
+				dba = new NotesDB(dx, false, true);
 			else 
 				dba = NotesDB.initDBA(dx);
 			BufferedWriter bw = Files.newBufferedWriter(q, utf8);
 			for (Map.Entry<String, Integer> ea: Area.areaToCode.entrySet()) {
 				String area = ea.getKey();
+				boolean g = false;
 				for (Pattern pt: e.getValue()) if (pt.matcher(area).matches()) {
-					dba.addArea(area, ea.getValue());
 					bw.write(area + "\t" + Area.areaToDescr.get(area) + "\n");
-//					g = true;
+					g = true;
 				}
+				if (g) Area.addForNick(nick, area);
 			}
 			bw.close();
 			dbas.add(dba);
@@ -534,7 +608,7 @@ public class Launchpad {
 		System.out.println(a2);
 		for (int num: a2) {
 			if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
-			URL u = getByScheme("E", num, 0);
+			URL u = null; //getByScheme("E", num, 0);
 			Path tmp = Cache.fs.getPath(String.format("%010d.xml", num));
 	    	BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
 	    	Page o = wc.getPage(u);
@@ -643,13 +717,12 @@ public class Launchpad {
 	void deepAreaTest(NotesDB db, NotesDB dba) throws SQLException, IOException, ParseException {
 		List<AZ> azl = dba.getZ3b();	// only number and area are filled
 		for (AZ az: azl) {
-			if (az.secnote) continue;
 			String lang = az.prop.getLanguage();
 			int ver = Integer.valueOf(az.prop.getVersion());
 
 			Path tmp = Cache.fs.getPath( String.format("%010d.xml", az.num));
 			if (az.longTexts==0) {
-				URL u = getByScheme(az.kba ? EScheme.KBA : EScheme.Corr, lang, az.num, ver, "LongText");
+				URL u = getByScheme(true ? EScheme.KBA : EScheme.Corr, lang, az.num, ver, "LongText");
 				int rc = 200;
 				if (!Files.isRegularFile(tmp)) {
 					BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
@@ -757,22 +830,22 @@ public class Launchpad {
     	URL u = new URL(s);
     	return u;
 	}
-	public static WebClient getLaunchpad(String suname, HttpHost prHost, Credentials prCred) throws IOException {
+	public static WebClient getLaunchpad(String uname, HttpHost prHost, Credentials prCred) throws IOException {
 		URL ln = new URL("https://launchpad.support.sap.com/services/odata/svt/snogwscorr/");
 		WebClient webClient = null;
-		assert suname != null;
+		assert uname != null;
 		
         if (prHost!=null)
         	webClient = new WebClient(BrowserVersion.CHROME, prHost.getHostName(), prHost.getPort());
         else
         	webClient = new WebClient(BrowserVersion.CHROME);
 
-        String passwd = Utils.getPasswd(suname);
+        String passwd = Utils.getPasswd(uname);
         CredentialsProvider cp = webClient.getCredentialsProvider();
         if (prHost!=null) 
         	cp.setCredentials(new AuthScope(prHost), prCred);
         
-        UsernamePasswordCredentials suser = new UsernamePasswordCredentials(suname, passwd);
+        UsernamePasswordCredentials suser = new UsernamePasswordCredentials(uname, passwd);
         cp.setCredentials(new AuthScope(AuthScope.ANY_HOST, AuthScope.ANY_PORT), suser);
 
         com.gargoylesoftware.htmlunit.Cache zc = new com.gargoylesoftware.htmlunit.Cache();
@@ -800,16 +873,21 @@ public class Launchpad {
 	    HtmlForm form = x.getForms().get(0);
 	    assert form.getAttribute("id").equals("logOnForm");
 	    HtmlTextInput textField = form.getInputByName("j_username");
-	    textField.setValueAttribute(suname);
+	    textField.setValueAttribute(uname);
 	    HtmlPasswordInput textField2 = form.getInputByName("j_password");
 	    textField2.setValueAttribute(passwd);
 	    List<HtmlElement> buttons = form.getElementsByAttribute("button", "type", "submit");
 	    HtmlButton button = (HtmlButton)buttons.get(0);
-	    Object o = button.click();
-	    assert o instanceof XmlPage;
-	    passwd = null;
+	    SgmlPage o = button.click();
+	    int rc = o.getWebResponse().getStatusCode();
 	    webClient.getOptions().setJavaScriptEnabled(false);
 	    webClient.getOptions().setCssEnabled(false);
+	    if (rc>399) {
+	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(Cache.fs.getPath("Launchpad_login_error.html")));
+		    throw new RuntimeException(String.format("Failed (rc=%d) when log on to %s, see Launchpad_login_error.html", rc, ln));
+	    }
+	    assert o instanceof XmlPage : o;
+	    passwd = null;
 	    return webClient;
 	}
 	
@@ -868,11 +946,31 @@ public class Launchpad {
 	 * @throws IOException
 	 * @throws SQLException
 	 */
-	void getNotes(NotesDB cdb, NotesDB dba) throws IOException, SQLException {
+	void getNotes(NotesDB cdb, NotesDB dba, boolean debug) throws IOException, SQLException {
 		assert cache!=null && cdb!=null && dba!=null;
 		assert !cdb.dba && dba.dba;
 		assert !cdb.isClosed() && !dba.isClosed();
+		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
+		List<AZ> azs = cdb.getNotesCDB_byAreas(areas), ozs = dba.getZ3b();
+		List<AZ> d1 = new ArrayList<AZ>(), d2 = new ArrayList<AZ>(), d3 = new ArrayList<AZ>();
+		for (AZ x: azs) {
+			if (ozs.contains(x)) 
+				d1.add(x);
+			else
+				d2.add(x);	// exists at CDB, not exists at DBA
+		}
+		for (AZ x: ozs) {
+			if (!azs.contains(x)) d3.add(x); 
+		}
 		System.out.println(dba.getNick());
+		// completely unknown notes -- need to download
+		downloadNotes(d2, dba, debug);
+//		System.out.println(areas);
+//		System.out.println(azs);
+//		System.out.println(ozs);
+//		System.out.println("d2:"+d2);
+//		System.out.println("d3:"+d3);
+//		cdb.getZ3();
 //		cdb.getZ3(area)
 	}
 	
@@ -924,6 +1022,27 @@ public class Launchpad {
 			System.out.println();
 		}
 	}
+	
+	/**
+	 * completely new notes
+	 * @param nc
+	 * @param dba
+	 * @throws IOException
+	 * @throws SQLException
+	 */
+	private void downloadNotes(Collection<AZ> nc, NotesDB dba, boolean debug) throws IOException, SQLException {
+		if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+		for (AZ az: nc) {
+			// TODO look for stored archive
+			Instant n = Instant.now();
+			Entry en = AZ.downloadEntry(wc, az.num, "E", 0, az.mark, debug);
+			dba.put(en.getContent().getProperties(), n);
+
+		}
+	}
+	
+	
+	
 }
 
 /*
