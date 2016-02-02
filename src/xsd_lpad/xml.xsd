@@ -3,5 +3,5 @@
   <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices" schemaLocation="d.xsd"/>
   <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" schemaLocation="m.xsd"/>
   <xs:import namespace="http://www.w3.org/2005/Atom" schemaLocation="entry.xsd"/>
-  <xs:attribute name="base" type="xs:anyURI"/>
+  <xs:attribute name="base" type="xs:string"/>
 </xs:schema>

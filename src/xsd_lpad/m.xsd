@@ -30,7 +30,17 @@
     		<xs:element ref="d:RefUrl"/>
     		<xs:element ref="d:RefKey"/>
     		<xs:element ref="d:LanguageText"/>
-    		<xs:element ref="d:Favorite"/> 		
+    		<xs:element ref="d:Favorite"/>
+    		
+    		<xs:element ref="d:PakId"/>
+    		<xs:element ref="d:AleiKey"/>
+    		<xs:element ref="d:Name"/>
+    		<xs:element ref="d:VerFrom"/>
+    		<xs:element ref="d:VerTo"/>
+    		
+    		<xs:element ref="d:Sp"/>
+    		<xs:element ref="d:Level"/>
+    		
     	</xs:all>
       <!--xs:sequence>
         <xs:element ref="d:SapNotesNumber"/>

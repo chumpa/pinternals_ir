@@ -20,7 +20,7 @@
   </xs:element>
   <xs:element name="category">
     <xs:complexType>
-      <xs:attribute name="scheme" use="required" type="xs:anyURI"/>
+      <xs:attribute name="scheme" use="required" type="xs:string"/>
       <xs:attribute name="term" use="required"/>
     </xs:complexType>
   </xs:element>
@@ -32,38 +32,37 @@
       <xs:attribute name="type" use="required"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="id" type="xs:anyURI"/>
+	<xs:element name="id" type="xs:string"/>
   <xs:element name="title">
     <xs:complexType mixed="true">
-      <xs:attribute name="type" use="required" type="xs:NCName"/>
+    	<xs:attribute name="type" use="required" type="xs:string"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="updated" type="xs:dateTime"/>
+	<xs:element name="updated" type="xs:string"/>
   <xs:element name="link">
     <xs:complexType>
       <xs:sequence>
         <xs:element minOccurs="0" ref="m:inline"/>
       </xs:sequence>
       <xs:attribute name="href" use="required"/>
-      <xs:attribute name="rel" use="required" type="xs:anyURI"/>
-      <xs:attribute name="title" use="required" type="xs:NCName"/>
+    	<xs:attribute name="rel" use="required" type="xs:string"/>
+    	<xs:attribute name="title" use="required" type="xs:string"/>
       <xs:attribute name="type"/>
     </xs:complexType>
   </xs:element>
-  <xs:element name="feed">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="atom:id"/>
-        <xs:element ref="atom:title"/>
-        <xs:element ref="atom:updated"/>
-        <xs:element ref="atom:author"/>
-        <xs:element ref="atom:link"/>
-        <xs:element minOccurs="0" maxOccurs="unbounded" ref="atom:entry"/>
-      </xs:sequence>
-      <xs:attribute ref="xml:base" use="required"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="author">
+	<xs:complexType name="Feed">
+		<xs:sequence>
+			<xs:element ref="atom:id"/>
+			<xs:element ref="atom:title"/>
+			<xs:element ref="atom:updated"/>
+			<xs:element ref="atom:author"/>
+			<xs:element ref="atom:link"/>
+			<xs:element minOccurs="0" maxOccurs="unbounded" ref="atom:entry"/>
+		</xs:sequence>
+		<xs:attribute ref="xml:base" use="required"/>
+	</xs:complexType>
+	<xs:element name="feed" type="atom:Feed"/>
+	<xs:element name="author">
     <xs:complexType>
       <xs:sequence>
         <xs:element ref="atom:name"/>
