@@ -43,6 +43,10 @@ public class NotesRetriever {
 		o.setRequired(false);
 		opts.addOption(o);
 
+		o = new Option("d", "debug", false, "debug mode");
+		o.setRequired(false);
+		opts.addOption(o);
+
 		CommandLineParser parser = new DefaultParser();
 		HelpFormatter formatter = new HelpFormatter();
 		CommandLine cmd = parser.parse(opts, argv);
@@ -173,7 +177,9 @@ public class NotesRetriever {
 					for (NotesDB dba: l.dbas) {
 						String nick = dba.getNick();
 						if (as==1 || args.contains(nick)) {
-							l.getNotes(db, dba, true);
+							while (l.getNotes(db, dba, cmd.hasOption('d'))) {
+								System.out.println(nick + " passed");
+							}
 							args.remove(nick);
 						} else {
 							System.err.println(String.format("warn: %s not used", nick));

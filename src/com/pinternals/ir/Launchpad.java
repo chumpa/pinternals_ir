@@ -56,9 +56,6 @@ import com.gargoylesoftware.htmlunit.html.HtmlPage;
 import com.gargoylesoftware.htmlunit.html.HtmlPasswordInput;
 import com.gargoylesoftware.htmlunit.html.HtmlTextInput;
 import com.gargoylesoftware.htmlunit.xml.XmlPage;
-import com.sap.Entry;
-import com.sap.Feed;
-import com.sap.Properties;
 import com.sap2.CWBCIHEAD;
 import com.sap2.CWBCIOBJ;
 import com.sap2.CWBCIVALID;
@@ -69,6 +66,24 @@ import com.sap2.CWBNTGATTR;
 import com.sap2.CWBNTHEAD;
 import com.sap2.CWBNTSTXT;
 import com.sap2.CWBNTVALID;
+
+class NoteRetrException extends RuntimeException {
+	private static final long serialVersionUID = 9041797099776264027L;
+	final static String nry = "This note has not been released";	    	
+	boolean notreleased = false;
+	String errText = null;
+	URL url = null;
+	int rc = 0;
+
+	NoteRetrException(Path ph, URL u, int rc) throws IOException {
+		com.sap.err.Error error = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
+		this.errText = error.getMessage().getContent();
+		this.url = u;
+		notreleased = rc==400 & nry.equals(errText);
+		this.rc = rc;
+//		throw new RuntimeException(String.format("Failed (rc=%d) to get %s, look at %s%n%s - %s", rc, u, ph, error.getCode(), error.getMessage().getContent()));
+	}
+}
 
 class NoteA {
 	static final Charset utf8 = Charset.forName("UTF-8");
@@ -305,20 +320,24 @@ class NoteA {
 }
 
 class AZ{
-	int num, mark, longTexts=0;
+	int num, mark, longTexts=0, swcv=0, sp=0;
 	String area, askdate=null, objid=null;
-	com.sap.Properties prop=null;
+	com.sap.lpad.Properties mprop=null;
 	
 	@Override
 	public String toString() {
 		return String.valueOf(num);
 	}
 	
-	@Override
-	public boolean equals(Object obj) {
-		assert obj!=null && obj instanceof AZ;
-		return num==((AZ)obj).num;
-	};
+	boolean secnote() {
+		assert mprop!=null;
+		return mprop.getType().equals("SAP Security Note");
+	}
+//	@Override
+//	public boolean equals(Object obj) {
+//		assert obj!=null && obj instanceof AZ;
+//		return num==((AZ)obj).num;
+//	};
 	
 //	boolean foundA = false;
 //	void foundA(String askdate, com.sap.Properties p) {
@@ -350,7 +369,7 @@ class AZ{
 	 * @param debug
 	 * @throws IOException
 	 */
-	static Entry downloadEntry(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException {
+	static com.sap.lpad.Entry downloadEntry(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {
     	Path ph = Cache.fs.getPath(String.format("errorEntry_%010d.html", num));
 		URL u = null;
 		if (mark==NotesDB.SAP_KBA) {
@@ -361,18 +380,17 @@ class AZ{
 		Page o = wc.getPage(u);
 		WebResponse wr = o.getWebResponse();
 		int rc = wr.getStatusCode();
-		Entry en;
+		com.sap.lpad.Entry en;
 		if (rc>399) {
 	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-	    	// check if note is not released yet
-	    	com.sap.err.Error er = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
-			throw new RuntimeException(String.format("Failed (rc=%d) to get %s, look at %s", rc, u, ph));
+	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
+	    	throw ne;
 		} else if (debug) {
 			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry.xml", num, lang, ver));
 			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-			en = JAXB.unmarshal(Files.newInputStream(ph), Entry.class);
+			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
 		} else {
-			en = JAXB.unmarshal(wr.getContentAsStream(), Entry.class);
+			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
 		}
 		return en;
 	}
@@ -383,7 +401,7 @@ class AZ{
 	 * @param debug
 	 * @throws IOException
 	 */
-	static Feed downloadFeeds(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ... args) throws IOException {
+	static com.sap.lpad.Feed downloadFeeds(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ... args) throws IOException, NoteRetrException {
     	Path ph = Cache.fs.getPath(String.format("errorFeeds_%010d.html", num));
 		URL u = null;
 		if (mark==NotesDB.SAP_KBA) {
@@ -391,20 +409,22 @@ class AZ{
 		} else {
 			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver, args);
 		}
+		if (debug) System.out.println(u);
 		Page o = wc.getPage(u);
 		WebResponse wr = o.getWebResponse();
 		int rc = wr.getStatusCode();
-		Feed fd;
+		com.sap.lpad.Feed fd;
+		System.out.println(rc);
 		if (rc>399) {
 	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-	    	// try if note is not released yet
-			throw new RuntimeException(String.format("Failed (rc=%d) to get %s, look at %s", rc, u, ph));
+	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
+	    	throw ne;
 		} else if (debug) {
 			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_feed.xml", num, lang, ver));
 			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-			fd = JAXB.unmarshal(Files.newInputStream(ph), Feed.class);
+			fd = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Feed.class);
 		} else {
-			fd = JAXB.unmarshal(wr.getContentAsStream(), Feed.class);
+			fd = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Feed.class);
 		}
 		return fd;
 	}
@@ -478,8 +498,7 @@ public class Launchpad {
 		a.close();
 		return q;
 	}
-	
-	
+
 	/**
 	 * 
 	 * @param cdb	central notes.db
@@ -490,7 +509,7 @@ public class Launchpad {
 		assert cdb!=null && cache!=null;
 		assert dbas==null;
 		dbas = new ArrayList<NotesDB>();
-		Area.init(cdb);
+		cdb.initArea();
 		Area.reload();
 		Map<String,List<Pattern>> lines = parseAreaList(cache.getLaunchpadArealist());
 
@@ -506,7 +525,7 @@ public class Launchpad {
 
 			NotesDB dba = null;
 			if (Files.isRegularFile(dx))
-				dba = new NotesDB(dx, false, true);
+				dba = new NotesDB(dx, true, true);
 			else 
 				dba = NotesDB.initDBA(dx);
 			BufferedWriter bw = Files.newBufferedWriter(q, utf8);
@@ -600,8 +619,6 @@ public class Launchpad {
 	// for given pattern, ask launchpad.support.sap.com for any english note
 	@Deprecated
 	void a2(NotesDB db, String pat) throws SQLException, IOException, ParseException {
-		Area.init(db);
-		Area.reload();
 		List<String> ar = new ArrayList<String>();
 		for (String x: Area.areaToDescr.keySet()) if (Area.areaToDescr.get(x)==null) ar.add(x);
 		List<Integer> a2 = db.arrrrrrrrrr(ar, pat);
@@ -617,7 +634,7 @@ public class Launchpad {
 	    	w.write(wr.getContentAsString());
 	    	w.close();
 	    	if (rc>=200 && rc<=299) {
-	    		Entry en = JAXB.unmarshal(tmp.toFile(), Entry.class);
+	    		com.sap.lpad.Entry en = JAXB.unmarshal(tmp.toFile(), com.sap.lpad.Entry.class);
 	    		String x = en.getContent().getProperties().getComponentKey(), y = en.getContent().getProperties().getComponentText();
 	    		System.out.println(String.format("%s\t%s", x, y));
 	    		Area.handleLaunchpad(x, y);
@@ -715,10 +732,10 @@ public class Launchpad {
 	
 	@Deprecated
 	void deepAreaTest(NotesDB db, NotesDB dba) throws SQLException, IOException, ParseException {
-		List<AZ> azl = dba.getZ3b();	// only number and area are filled
+		List<AZ> azl = dba.getNotesDBA();	// only number and area are filled
 		for (AZ az: azl) {
-			String lang = az.prop.getLanguage();
-			int ver = Integer.valueOf(az.prop.getVersion());
+			String lang = az.mprop.getLanguage();
+			int ver = Integer.valueOf(az.mprop.getVersion());
 
 			Path tmp = Cache.fs.getPath( String.format("%010d.xml", az.num));
 			if (az.longTexts==0) {
@@ -733,13 +750,13 @@ public class Launchpad {
 					w.write(wr.getContentAsString());
 					w.close();
 				} 
-	    		Feed f = JAXB.unmarshal(tmp.toFile(), Feed.class);
+				com.sap.lpad.Feed f = JAXB.unmarshal(tmp.toFile(), com.sap.lpad.Feed.class);
 	    		int i = 0;
-	    		for (Entry e: f.getEntries()) {
-	    			com.sap.Properties p = e.getContent().getProperties();
-	    			dba.put("LongText", az.prop, p, Instant.now());
+//	    		for (com.sap.lpad.Entry e: f.getEntries()) {
+//	    			com.sap.Properties p = e.getContent().getProperties();
+//	    			dba.put("LongText", az.prop, p, Instant.now());
 	    			i++;
-	    		}
+//	    		}
 	    		if (i>0) dba.commit();
 	    		if (rc>=200 && rc<=299) {
 	    			Files.delete(tmp);
@@ -753,8 +770,8 @@ public class Launchpad {
 		if (!Files.isDirectory(tmd)) Files.createDirectory(tmd);
 		List<AZ> azu = new ArrayList<AZ>();
 		for (AZ az: azl) {
-			String lang = az.prop.getLanguage();
-			int ver = Integer.valueOf(az.prop.getVersion());
+			String lang = az.mprop.getLanguage();
+			int ver = Integer.valueOf(az.mprop.getVersion());
 
 			Path tmp = Cache.fs.getPath(tmd.toString(), String.format("%010d_%d_%s.zip", az.num, ver, lang));
 
@@ -912,7 +929,7 @@ public class Launchpad {
 		    	w.flush();
 		    	w.close();
 		    	if (rc>=200 && rc<=299) {
-		    		Entry en = JAXB.unmarshal(p.toFile(), Entry.class);
+		    		com.sap.lpad.Entry en = JAXB.unmarshal(p.toFile(), com.sap.lpad.Entry.class);
 		    		System.out.println(en.getContent().getProperties().getType());
 		    	} else {
 		    		System.err.println(wr.getStatusMessage());
@@ -924,8 +941,8 @@ public class Launchpad {
 	    }
 	    System.out.println(String.format("%nAverage is %s / %d", Duration.between(t2, th), nums.length));
 	    p = Cache.fs.getPath("tmp", "0001381198.xml");
-	    Entry en = JAXB.unmarshal(p.toFile(), Entry.class);
-	    Properties r = en.getContent().getProperties();
+	    com.sap.lpad.Entry en = JAXB.unmarshal(p.toFile(), com.sap.lpad.Entry.class);
+	    com.sap.lpad.Properties r = en.getContent().getProperties();
 	    System.out.println(r.getVersion());
 	    String x = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()));
 	    System.out.println(x);
@@ -946,26 +963,113 @@ public class Launchpad {
 	 * @throws IOException
 	 * @throws SQLException
 	 */
-	void getNotes(NotesDB cdb, NotesDB dba, boolean debug) throws IOException, SQLException {
+	boolean getNotes(NotesDB cdb, NotesDB dba, boolean debug) throws IOException, SQLException {
 		assert cache!=null && cdb!=null && dba!=null;
 		assert !cdb.dba && dba.dba;
 		assert !cdb.isClosed() && !dba.isClosed();
-		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
-		List<AZ> azs = cdb.getNotesCDB_byAreas(areas), ozs = dba.getZ3b();
-		List<AZ> d1 = new ArrayList<AZ>(), d2 = new ArrayList<AZ>(), d3 = new ArrayList<AZ>();
-		for (AZ x: azs) {
-			if (ozs.contains(x)) 
-				d1.add(x);
-			else
-				d2.add(x);	// exists at CDB, not exists at DBA
-		}
-		for (AZ x: ozs) {
-			if (!azs.contains(x)) d3.add(x); 
-		}
 		System.out.println(dba.getNick());
+		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
+		List<AZ> azs = cdb.getNotesCDB_byAreas(areas), ozs = dba.getNotesDBA();
+		boolean needmore = false, e;
+		Instant n;
+		for (AZ x: azs) { // every x.num occurs at `azs` once
+			assert x.num>0 && x.mark>=0 && x.objid!=null && x.area!=null && x.mprop==null;
+			e = true;
+			com.sap.lpad.Entry en = null;
+			com.sap.lpad.Feed fd = null;
+			// many y.num may occurs at `ozs`. The unique key is num-version-language
+			for (AZ y: ozs) if (x.num==y.num) {
+				assert y.num>0 : y.num;
+				assert y.mark>0 : y.mark;
+				assert y.objid!=null : y.objid;
+				assert y.area!=null : y.area;
+				assert y.mprop!=null : y.mprop;
+				e = false;
+				int ver = Integer.parseInt(y.mprop.getVersion());
+				int mark = NotesDB.types.get(y.mprop.getType());
+				if (x.mark!=y.mark) { 
+					assert x.mark==0 : x.num;
+					System.out.println(String.format("Note %s has to be turned to mark=%d", x.num, y.mark));
+					cdb.setMark(x.num, y.mark);
+					x.mark = y.mark;
+				}
+				if (!x.objid.equals(y.objid)) {
+					assert x.objid.startsWith("Z") : x.num;
+					System.out.println(String.format("Note %s has to be turned to objid=%s", x.num, y.objid));
+					cdb.setObjid(x.num, y.objid);
+					x.objid = y.objid;
+				}
+				// check if title and version are exists at CDB
+				System.out.println(y.num + "\t" + y.mprop.getType() + "\t" + y.longTexts + "\t" + y.swcv + "\t" + y.sp);
+				if (y.longTexts<2 && !y.secnote()) {
+					if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+					try {
+						n = Instant.now();
+						fd = AZ.downloadFeeds(wc, x.num, y.mprop.getLanguage(), ver, mark, debug, "LongText");
+						dba.putFeeds(y.mprop, fd, n);
+					} catch (NoteRetrException nre) {
+						System.err.println(nre.errText);
+						e = false;
+					}
+				}
+				if (y.swcv==0) {
+					if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+					try {
+						n = Instant.now();
+						fd = AZ.downloadFeeds(wc, x.num, y.mprop.getLanguage(), ver, mark, debug, "SoftCom");
+						dba.putFeeds(y.mprop, fd, n);
+					} catch (NoteRetrException nre) {
+						System.err.println(nre.errText);
+						e = false;
+						throw new RuntimeException(nre);
+					}
+				}
+				if (y.sp==0) {
+					if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+					try {
+						n = Instant.now();
+						fd = AZ.downloadFeeds(wc, x.num, y.mprop.getLanguage(), ver, mark, debug, "Sp");
+						dba.putFeeds(y.mprop, fd, n);
+					} catch (NoteRetrException nre) {
+						System.err.println(nre.errText);
+						e = false;
+						throw new RuntimeException(nre);
+					}
+				}
+				
+			} // for (y: ozs) if x.num==y.num
+			if (e) {
+				// exists at CDB, not exists at DBA
+				// neet to download at least 
+				System.out.println("Need to download: " + x.num);
+				if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+				n = Instant.now();
+				try {
+					en = AZ.downloadEntry(wc, x.num, "E", 0, x.mark, debug);
+					dba.putA01(en.getContent().getProperties(), n);
+					int ver = Integer.parseInt(en.getContent().getProperties().getVersion());
+					int mark = NotesDB.types.get(en.getContent().getProperties().getType());
+					n = Instant.now();
+					fd = AZ.downloadFeeds(wc, x.num, en.getContent().getProperties().getLanguage(), ver, mark, debug, "LongText", "SoftCom", "Sp");
+					dba.putFeeds(en.getContent().getProperties(), fd, n);
+				} catch (NoteRetrException nre) {
+					if (nre.notreleased) System.err.println("Not released yet: " + x.num);
+					e = false;
+				}
+			}
+			needmore = needmore || e;
+		}
+		return needmore;
 		// completely unknown notes -- need to download
-		downloadNotes(d2, dba, debug);
-//		System.out.println(areas);
+//		
+		// TODO look for stored archive
+//				
+//		try {
+//			
+//			
+//		} catch (NoteRetrException nre) {
+//			
+//		}
 //		System.out.println(azs);
 //		System.out.println(ozs);
 //		System.out.println("d2:"+d2);
@@ -1031,14 +1135,7 @@ public class Launchpad {
 	 * @throws SQLException
 	 */
 	private void downloadNotes(Collection<AZ> nc, NotesDB dba, boolean debug) throws IOException, SQLException {
-		if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-		for (AZ az: nc) {
-			// TODO look for stored archive
-			Instant n = Instant.now();
-			Entry en = AZ.downloadEntry(wc, az.num, "E", 0, az.mark, debug);
-			dba.put(en.getContent().getProperties(), n);
 
-		}
 	}
 	
 	
