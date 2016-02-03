@@ -1,6 +1,7 @@
 package com.pinternals.ir;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -199,33 +200,26 @@ public class NotesDB {
 		return con.prepareStatement(sqlrb.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 	}
 
-	static void initDB(Path db) throws SQLException {
-		NotesDB ndb = new NotesDB(db, false, false);
+//	static void initDB(Path db) throws SQLException {
+//		NotesDB ndb = new NotesDB(db, true, false, false);
+//
+//		ndb.con.commit();
+//
+//		for (String s: sqlrb.keySet()) {
+//			System.out.print(s + " ");
+//			ndb.sql(s);	// is statement compilable ?
+//		}
+//	}
+//	
+//	static NotesDB initDBA(Path db) throws SQLException {
+//		NotesDB ndb = new NotesDB(db, true, false, true);
+//		ndb.con.commit();
+//		ndb.close();
+//		ndb = new NotesDB(db, true, true);
+//		return ndb;
+//	}	
 
-		for (String s: ddlrb.keySet()) if (s.startsWith("0")) {
-			System.out.println(s);
-			PreparedStatement ps = ndb.con.prepareStatement(ddl(s));
-			ps.execute();
-		}
-		ndb.con.commit();
-
-		for (String s: sqlrb.keySet()) {
-			System.out.print(s + " ");
-			ndb.sql(s);	// is statement compilable ?
-		}
-	}
-	
-	static NotesDB initDBA(Path db) throws SQLException {
-		NotesDB ndb = new NotesDB(db, false, true);
-		for (String s: ddlrb.keySet()) if (s.startsWith("a")) 
-			ndb.con.prepareStatement(ddl(s)).execute();
-		ndb.con.commit();
-		ndb.close();
-		ndb = new NotesDB(db, true, true);
-		return ndb;
-	}	
-
-	NotesDB(Path pat, boolean checksql, boolean isdba) throws SQLException {
+	NotesDB(Path pat, boolean init, boolean checksql, boolean isdba) throws SQLException {
 		this.pathdb = pat;
 		this.dba = isdba;
 		try {
@@ -235,22 +229,36 @@ public class NotesDB {
 		}
 		con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + pat.toFile());
 		con.setAutoCommit(false);
-		if (checksql && !dba) 
-			for (String s: sqlrb.keySet()) sql(s);	// is statement compilable ?
-		if (checksql && dba) 
-			for (String s: sqlab.keySet()) {
+		if (init) {
+			if (!dba) {
+				for (String s: ddlrb.keySet()) if (s.startsWith("0")) {
+					System.out.println(s);
+					PreparedStatement ps = con.prepareStatement(ddl(s));
+					ps.execute();
+				}
+			} else
+				for (String s: ddlrb.keySet()) if (s.startsWith("a")) 
+					con.prepareStatement(ddl(s)).execute();
+		}
+		con.commit();
+		ResourceBundle rb = dba ? sqlab : sqlrb;
+		if (checksql) {
+			for (String s: rb.keySet()) {
+				PreparedStatement ps = null;
+				String sq = rb.getString(s);
 				try {
-					sqla(s);	// is statement compilable ?
+					ps = con.prepareStatement(sq, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 				} catch (SQLException e) {
-					System.err.println(pat + "\t" + s + "\t" + sqlab.getString(s));
-					System.err.println(e.getMessage());
-					System.err.println(e.getSQLState());
+					System.err.println(String.format("database %s cannot compile '%s'%n%s%n%s", pat, s, sq, e.getMessage()));
 					throw e;
+				} finally {
+					if (ps!=null) ps.close();
 				}
 			}
+		}
+		for (String s: rb.keySet()) if (s.startsWith("00open")) con.prepareStatement(rb.getString(s)).execute();
 		if (!dba) pairToMap3(sql("01types"), types);
-		if (!dba) for (String s: sqlrb.keySet()) if (s.startsWith("00open")) sql(s).execute();
-		if (dba) for (String s: sqlab.keySet()) if (s.startsWith("00open")) sqla(s).execute();
+		con.commit();
 	}
 
 	boolean isClosed() throws SQLException {

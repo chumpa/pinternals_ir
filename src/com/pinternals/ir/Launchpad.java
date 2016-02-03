@@ -394,7 +394,32 @@ class AZ{
 		}
 		return en;
 	}
-	
+
+	static com.sap.lpad.Entry downloadEntry2(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ...args) throws IOException, NoteRetrException {
+    	Path ph = Cache.fs.getPath(String.format("errorEntry_%010d.html", num));
+		URL u = null;
+		if (mark==NotesDB.SAP_KBA) {
+			u = Launchpad.getByScheme2(EScheme.KBA, lang, num, ver, args);
+		} else {
+			u = Launchpad.getByScheme2(EScheme.Corr, lang, num, ver, args);
+		}
+		Page o = wc.getPage(u);
+		WebResponse wr = o.getWebResponse();
+		int rc = wr.getStatusCode();
+		com.sap.lpad.Entry en;
+		if (rc>399) {
+	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
+	    	throw ne;
+		} else if (debug) {
+			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry.xml", num, lang, ver));
+			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
+		} else {
+			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
+		}
+		return en;
+	}	
 	/**
 	 * downloads main entry, with no feeds
 	 * @param wc
@@ -525,9 +550,9 @@ public class Launchpad {
 
 			NotesDB dba = null;
 			if (Files.isRegularFile(dx))
-				dba = new NotesDB(dx, true, true);
+				dba = new NotesDB(dx, false, true, true);
 			else 
-				dba = NotesDB.initDBA(dx);
+				dba = new NotesDB(dx, true, true, true);
 			BufferedWriter bw = Files.newBufferedWriter(q, utf8);
 			for (Map.Entry<String, Integer> ea: Area.areaToCode.entrySet()) {
 				String area = ea.getKey();
@@ -617,38 +642,36 @@ public class Launchpad {
 //	}
 	
 	// for given pattern, ask launchpad.support.sap.com for any english note
-	@Deprecated
-	void a2(NotesDB db, String pat) throws SQLException, IOException, ParseException {
-		List<String> ar = new ArrayList<String>();
-		for (String x: Area.areaToDescr.keySet()) if (Area.areaToDescr.get(x)==null) ar.add(x);
-		List<Integer> a2 = db.arrrrrrrrrr(ar, pat);
-		System.out.println(a2);
-		for (int num: a2) {
-			if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
-			URL u = null; //getByScheme("E", num, 0);
-			Path tmp = Cache.fs.getPath(String.format("%010d.xml", num));
-	    	BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
-	    	Page o = wc.getPage(u);
-	    	WebResponse wr = o.getWebResponse();
-	    	int rc = wr.getStatusCode();
-	    	w.write(wr.getContentAsString());
-	    	w.close();
-	    	if (rc>=200 && rc<=299) {
-	    		com.sap.lpad.Entry en = JAXB.unmarshal(tmp.toFile(), com.sap.lpad.Entry.class);
-	    		String x = en.getContent().getProperties().getComponentKey(), y = en.getContent().getProperties().getComponentText();
-	    		System.out.println(String.format("%s\t%s", x, y));
-	    		Area.handleLaunchpad(x, y);
-	    		Files.delete(tmp);
-	    	} else {
-	    		System.err.println(num + "\tHTTP_ERROR:"+rc);
-	    	}			
-		}
-		Area.updateLaunchpad();
-		if (wc!=null) wc.close();
-	}
+//	void a2(NotesDB db, String pat) throws SQLException, IOException, ParseException {
+//		List<String> ar = new ArrayList<String>();
+//		for (String x: Area.areaToDescr.keySet()) if (Area.areaToDescr.get(x)==null) ar.add(x);
+//		List<Integer> a2 = db.arrrrrrrrrr(ar, pat);
+//		System.out.println(a2);
+//		for (int num: a2) {
+//			if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+//			URL u = null; //getByScheme("E", num, 0);
+//			Path tmp = Cache.fs.getPath(String.format("%010d.xml", num));
+//	    	BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
+//	    	Page o = wc.getPage(u);
+//	    	WebResponse wr = o.getWebResponse();
+//	    	int rc = wr.getStatusCode();
+//	    	w.write(wr.getContentAsString());
+//	    	w.close();
+//	    	if (rc>=200 && rc<=299) {
+//	    		com.sap.lpad.Entry en = JAXB.unmarshal(tmp.toFile(), com.sap.lpad.Entry.class);
+//	    		String x = en.getContent().getProperties().getComponentKey(), y = en.getContent().getProperties().getComponentText();
+//	    		System.out.println(String.format("%s\t%s", x, y));
+//	    		Area.handleLaunchpad(x, y);
+//	    		Files.delete(tmp);
+//	    	} else {
+//	    		System.err.println(num + "\tHTTP_ERROR:"+rc);
+//	    	}			
+//		}
+//		Area.updateLaunchpad();
+//		if (wc!=null) wc.close();
+//	}
 
-	@Deprecated
-	void deepAreasOld(NotesDB db) throws SQLException, IOException, ParseException {
+//	void deepAreasOld(NotesDB db) throws SQLException, IOException, ParseException {
 //		assert pathToAreas!=null && areaToPaths!=null : "need to call importAreasDb(false||true) first";
 //		for (Path par: pathToAreas.keySet()) {
 //			assert par!=null && par.getFileName()!=null;
@@ -683,12 +706,12 @@ public class Launchpad {
 //			}
 //			//dba.close();	<-- cannot do that!
 //		}
-		return;
-	}
+//		return;
+//	}
 
 	@Deprecated
-	void deepAreas(NotesDB db, Map<Path,NotesDB> p2n) throws SQLException, IOException, ParseException {
-		if (p2n==null||p2n.size()==0) return;
+//	void deepAreas(NotesDB db, Map<Path,NotesDB> p2n) throws SQLException, IOException, ParseException {
+//		if (p2n==null||p2n.size()==0) return;
 //		for (Path par: p2n.keySet()) {
 //			NotesDB dba = p2n.get(par);
 //			System.out.println(">"+par.toString());
@@ -728,87 +751,87 @@ public class Launchpad {
 //				}
 //			}
 //		}
-	}
+//	}
 	
-	@Deprecated
-	void deepAreaTest(NotesDB db, NotesDB dba) throws SQLException, IOException, ParseException {
-		List<AZ> azl = dba.getNotesDBA();	// only number and area are filled
-		for (AZ az: azl) {
-			String lang = az.mprop.getLanguage();
-			int ver = Integer.valueOf(az.mprop.getVersion());
-
-			Path tmp = Cache.fs.getPath( String.format("%010d.xml", az.num));
-			if (az.longTexts==0) {
-				URL u = getByScheme(true ? EScheme.KBA : EScheme.Corr, lang, az.num, ver, "LongText");
-				int rc = 200;
-				if (!Files.isRegularFile(tmp)) {
-					BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
-					if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
-					Page o = wc.getPage(u);
-					WebResponse wr = o.getWebResponse();
-					rc = wr.getStatusCode();
-					w.write(wr.getContentAsString());
-					w.close();
-				} 
-				com.sap.lpad.Feed f = JAXB.unmarshal(tmp.toFile(), com.sap.lpad.Feed.class);
-	    		int i = 0;
-//	    		for (com.sap.lpad.Entry e: f.getEntries()) {
-//	    			com.sap.Properties p = e.getContent().getProperties();
-//	    			dba.put("LongText", az.prop, p, Instant.now());
-	    			i++;
+//	@Deprecated
+//	void deepAreaTest(NotesDB db, NotesDB dba) throws SQLException, IOException, ParseException {
+//		List<AZ> azl = dba.getNotesDBA();	// only number and area are filled
+//		for (AZ az: azl) {
+//			String lang = az.mprop.getLanguage();
+//			int ver = Integer.valueOf(az.mprop.getVersion());
+//
+//			Path tmp = Cache.fs.getPath( String.format("%010d.xml", az.num));
+//			if (az.longTexts==0) {
+//				URL u = getByScheme(true ? EScheme.KBA : EScheme.Corr, lang, az.num, ver, "LongText");
+//				int rc = 200;
+//				if (!Files.isRegularFile(tmp)) {
+//					BufferedWriter w = Files.newBufferedWriter(tmp, utf8);
+//					if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+//					Page o = wc.getPage(u);
+//					WebResponse wr = o.getWebResponse();
+//					rc = wr.getStatusCode();
+//					w.write(wr.getContentAsString());
+//					w.close();
+//				} 
+//				com.sap.lpad.Feed f = JAXB.unmarshal(tmp.toFile(), com.sap.lpad.Feed.class);
+//	    		int i = 0;
+////	    		for (com.sap.lpad.Entry e: f.getEntries()) {
+////	    			com.sap.Properties p = e.getContent().getProperties();
+////	    			dba.put("LongText", az.prop, p, Instant.now());
+//	    			i++;
+////	    		}
+//	    		if (i>0) dba.commit();
+//	    		if (rc>=200 && rc<=299) {
+//	    			Files.delete(tmp);
 //	    		}
-	    		if (i>0) dba.commit();
-	    		if (rc>=200 && rc<=299) {
-	    			Files.delete(tmp);
-	    		}
-			}
-		}
-	}
+//			}
+//		}
+//	}
 
-	List<AZ> deepAreaTest2(List<AZ> azl, Path tmd, int atMx) throws SQLException, IOException, ParseException {
-		assert tmd!=null && Files.isDirectory(tmd) && tmd.getFileName().endsWith("tmp");
-		if (!Files.isDirectory(tmd)) Files.createDirectory(tmd);
-		List<AZ> azu = new ArrayList<AZ>();
-		for (AZ az: azl) {
-			String lang = az.mprop.getLanguage();
-			int ver = Integer.valueOf(az.mprop.getVersion());
-
-			Path tmp = Cache.fs.getPath(tmd.toString(), String.format("%010d_%d_%s.zip", az.num, ver, lang));
-
-			// check if already exists
-			if (Files.isRegularFile(tmp) && Files.size(tmp)>700) continue;	// 788 bytes detected lowest xml size
-
-			URL u = getBySchemeZip(lang, az.num, ver, "/$value");
-			int rc = 200, attempts = 0;
-			while (attempts<atMx) {
-				OutputStream w = Files.newOutputStream(tmp);
-				if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
-				Page o = wc.getPage(u);
-				WebResponse wr = o.getWebResponse();
-				rc = wr.getStatusCode();
-				IOUtils.copy(wr.getContentAsStream(), w);
-				w.flush();
-				w.close();
-				if (rc==504) {	// temporary error, could be repeated
-					Files.delete(tmp);
-					continue;
-				}
-				if (Files.size(tmp)>0) 
-					break;
-				else
-					attempts++;
-			}
-			if (Files.size(tmp)==0) {
-//					System.out.println(az.num + "\t" + rc + "\t" + i + "/" + azl.size() + "\t" + sz + "\t" + attempts);
-//					System.err.println(az.num + "\t" + rc + "\t" + i + "/" + azl.size() + "\t" + sz);
-//					System.err.println(u);
-				Files.delete(tmp);
-				azu.add(az);
-			}
-		}
-		// return list of non-downloaded files
-		return azu;
-	}
+//	List<AZ> deepAreaTest2(List<AZ> azl, Path tmd, int atMx) throws SQLException, IOException, ParseException {
+//		assert tmd!=null && Files.isDirectory(tmd) && tmd.getFileName().endsWith("tmp");
+//		if (!Files.isDirectory(tmd)) Files.createDirectory(tmd);
+//		List<AZ> azu = new ArrayList<AZ>();
+//		for (AZ az: azl) {
+//			String lang = az.mprop.getLanguage();
+//			int ver = Integer.valueOf(az.mprop.getVersion());
+//
+//			Path tmp = Cache.fs.getPath(tmd.toString(), String.format("%010d_%d_%s.zip", az.num, ver, lang));
+//
+//			// check if already exists
+//			if (Files.isRegularFile(tmp) && Files.size(tmp)>700) continue;	// 788 bytes detected lowest xml size
+//
+//			URL u = getBySchemeZip(lang, az.num, ver, "/$value");
+//			int rc = 200, attempts = 0;
+//			while (attempts<atMx) {
+//				OutputStream w = Files.newOutputStream(tmp);
+//				if (wc==null) wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+//				Page o = wc.getPage(u);
+//				WebResponse wr = o.getWebResponse();
+//				rc = wr.getStatusCode();
+//				IOUtils.copy(wr.getContentAsStream(), w);
+//				w.flush();
+//				w.close();
+//				if (rc==504) {	// temporary error, could be repeated
+//					Files.delete(tmp);
+//					continue;
+//				}
+//				if (Files.size(tmp)>0) 
+//					break;
+//				else
+//					attempts++;
+//			}
+//			if (Files.size(tmp)==0) {
+////					System.out.println(az.num + "\t" + rc + "\t" + i + "/" + azl.size() + "\t" + sz + "\t" + attempts);
+////					System.err.println(az.num + "\t" + rc + "\t" + i + "/" + azl.size() + "\t" + sz);
+////					System.err.println(u);
+//				Files.delete(tmp);
+//				azu.add(az);
+//			}
+//		}
+//		// return list of non-downloaded files
+//		return azu;
+//	}
 
 //	void deepAreaTest2(NotesDB db, Path a, boolean online) throws SQLException, IOException, ParseException {
 //		assert Files.isDirectory(a) : a + " should be directory";
@@ -832,13 +855,28 @@ public class Launchpad {
 		else
 			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
 					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
-			
-		if (add!=null && add.length==1) 
-			s = s+"/"+add[0];
+		for (String x: add) 
+			s += "/"+x;
+//		if (add!=null && add.length==1) 
+//			s = s+"/"+add[0];
 //			+ "?$expand=LongText,RefBy,RefTo,Languages", num, ver, lang);
 		//SoftCom -- плохо
 //			+ "?$expand=LongText,SoftCom,RefBy,RefTo,Sp,Patch,Attach,CorrIns,SideSol,SideCau,Languages", num, ver, lang);
     	URL u = new URL(s);
+    	return u;
+	}
+	static URL getByScheme2(EScheme escheme, String lang, int num, int ver, String ...add) throws MalformedURLException {
+		assert add!=null && add.length>0;
+		String s;
+		if (escheme==EScheme.KBA)
+			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
+					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')?$expand=", num, ver, lang);
+		else
+			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
+					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')?$expand=", num, ver, lang);
+		for (String x: add) 
+			s += x+",";
+    	URL u = new URL(s.substring(0, s.length()-1));
     	return u;
 	}
 	static URL getBySchemeZip(String lang, int num, int ver, String value) throws MalformedURLException {
@@ -1041,17 +1079,14 @@ public class Launchpad {
 			if (e) {
 				// exists at CDB, not exists at DBA
 				// neet to download at least 
-				System.out.println("Need to download: " + x.num);
+				System.out.println("Need to download unknown note: " + x.num);
 				if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-				n = Instant.now();
 				try {
-					en = AZ.downloadEntry(wc, x.num, "E", 0, x.mark, debug);
-					dba.putA01(en.getContent().getProperties(), n);
-					int ver = Integer.parseInt(en.getContent().getProperties().getVersion());
-					int mark = NotesDB.types.get(en.getContent().getProperties().getType());
 					n = Instant.now();
-					fd = AZ.downloadFeeds(wc, x.num, en.getContent().getProperties().getLanguage(), ver, mark, debug, "LongText", "SoftCom", "Sp");
-					dba.putFeeds(en.getContent().getProperties(), fd, n);
+					en = AZ.downloadEntry2(wc, x.num, "E", 0, x.mark, debug, "LongText", "Languages");
+					dba.putA01(en.getContent().getProperties(), n);
+//					int ver = Integer.parseInt(en.getContent().getProperties().getVersion());
+//					int mark = NotesDB.types.get(en.getContent().getProperties().getType());
 				} catch (NoteRetrException nre) {
 					if (nre.notreleased) System.err.println("Not released yet: " + x.num);
 					e = false;

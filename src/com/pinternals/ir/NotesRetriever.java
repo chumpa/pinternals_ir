@@ -96,7 +96,7 @@ public class NotesRetriever {
 				if (Files.exists(d))
 					System.err.println(d + " is already exists, cannot overwrite");
 				else
-					NotesDB.initDB(d);
+					new NotesDB(d, true, true, false);
 				return;
 			}
 			String uname = null;
@@ -123,7 +123,7 @@ public class NotesRetriever {
 			HttpHost prHost = null;
 			Credentials prCred = null;
 			NotesDB db = null;
-			db = new NotesDB(cache.notesdb, true, false);
+			db = new NotesDB(cache.notesdb, false, true, false);
 			int rc = 0;
 			Launchpad l = null;
 			Support sup = null;
