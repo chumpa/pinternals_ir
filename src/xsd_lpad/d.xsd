@@ -40,5 +40,16 @@
 	<!-- Sp -->
 	<xs:element name="Sp" type="xs:string"/>
 	<xs:element name="Level" type="xs:string"/>
+	<!-- CorrInst -->
+	<xs:element name="Count" type="xs:string"/>
+	<!-- Attach -->
+	<xs:element name="FileName" type="xs:string"/>
+	<xs:element name="FileSize" type="xs:string"/>
+	<xs:element name="FileLink" type="xs:string"/>
+	<xs:element name="MimeType" type="xs:string"/>
+	<!-- Product -->
+	<xs:element name="ProductKey" type="xs:string"/>
+	<xs:element name="ProductName" type="xs:string"/>
+	<xs:element name="ProductVersion" type="xs:string"/>
 	
 </xs:schema>

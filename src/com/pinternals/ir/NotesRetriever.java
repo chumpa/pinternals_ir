@@ -7,6 +7,7 @@ import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.commons.cli.CommandLine;
@@ -188,7 +189,21 @@ public class NotesRetriever {
 					for (String x: args.subList(1, args.size())) System.out.println(String.format("warn: %s not found", x));
 					b = false;
 					break;
-				case "LPAD.X":
+				case "LPAD.IMPORT":
+					assert as>1;
+					l = new Launchpad(cache);
+					l.areaList(db);
+					Iterator<Path> it = Files.newDirectoryStream(FileSystems.getDefault().getPath("."), "000*_entryfacets.xml").iterator();
+					while (it.hasNext()) {
+						Path p = it.next();
+						for (NotesDB dba: l.dbas) {
+							String nick = dba.getNick();
+							if (args.contains(nick)) {
+								System.out.println(p);
+								l.importNote(dba, Files.newInputStream(p));
+							}
+						}
+					}
 					break;
 				case "SWDC.TEST":
 					System.out.println("Online support.sap.com/swdc for " + uname);

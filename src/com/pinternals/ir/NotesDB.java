@@ -1,13 +1,13 @@
 package com.pinternals.ir;
 
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
@@ -15,9 +15,11 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
+import java.util.StringJoiner;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 
@@ -189,6 +191,24 @@ public class NotesDB {
 		assert code!=null;
 		return con.prepareStatement(sqlab.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 	}
+	private PreparedStatement setPs(PreparedStatement ps, Object[] args) throws SQLException {
+		assert ps!=null && args!=null && args.length>0;
+		int i = 1;
+		for (Object o: args) {
+			if (o==null)
+				ps.setString(i, (String)o);
+			else if (o instanceof Integer) {
+				assert o!=null;
+				ps.setInt(i, (Integer)o);
+			} else if (o instanceof String)
+				ps.setString(i, (String)o);
+			else 
+				throw new SQLException("setPs, NIY: " + o.getClass() + " " + o);
+			i++;
+		}
+		return ps;
+	}
+	
 	/**
 	 * TODO: rewrite to truly updatable prepared statements
 	 * @param code
@@ -244,13 +264,13 @@ public class NotesDB {
 		ResourceBundle rb = dba ? sqlab : sqlrb;
 		if (checksql) {
 			for (String s: rb.keySet()) {
+				System.out.println(s);
 				PreparedStatement ps = null;
 				String sq = rb.getString(s);
 				try {
 					ps = con.prepareStatement(sq, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 				} catch (SQLException e) {
 					System.err.println(String.format("database %s cannot compile '%s'%n%s%n%s", pat, s, sq, e.getMessage()));
-					throw e;
 				} finally {
 					if (ps!=null) ps.close();
 				}
@@ -287,7 +307,6 @@ public class NotesDB {
 		}
 		r.close();
 	}	
-
 
 	Map<String,String> w44() throws SQLException {
 		PreparedStatement fcget = sql("009a");
@@ -431,46 +450,6 @@ public class NotesDB {
 		
 	}
 	
-//	List<AZ> getZ3(String area) throws SQLException {
-//		List<AZ> az = new ArrayList<AZ>(1000);
-//		PreparedStatement ps = sql("w07");
-//		ps.setString(1, area);
-//		ResultSet rs = ps.executeQuery();
-//		while (rs.next()) {
-//			int num = rs.getInt(1);
-//			String j = rs.getString(2);
-//			az.add(new AZ(num, j, area));
-//		}
-//		ps.close();
-//		return az;
-//	}
-	
-//	@Deprecated
-//	void getZ3a(List<AZ> azl) throws SQLException {
-//		PreparedStatement ps = con.prepareStatement("select askdate,NotesKey,"
-//				+ "Title,Type,Version,Priority,Category,ReleasedOn,ComponentKey,ComponentText,Language from a01 where NotesNumber=?;");
-//		ResultSet rs;
-//		for (AZ az: azl) {
-//			ps.setInt(1, az.num);
-//			rs = ps.executeQuery();
-//			while (rs.next()) {
-//				com.sap.Properties p = new Properties();
-//				p.setSapNotesNumber(String.valueOf(az.num));
-//				p.setSapNotesKey(rs.getString(2));
-//				p.setTitle(rs.getString(3));
-//				p.setType(rs.getString(4));
-//				p.setVersion(rs.getString(5));
-//				p.setPriority(rs.getString(6));
-//				p.setCategory(rs.getString(7));
-//				p.setReleasedOn(rs.getString(8));
-//				p.setComponentKey(rs.getString(9));
-//				p.setComponentText(rs.getString(10));
-//				p.setLanguage(rs.getString(11));
-//				az.foundA(rs.getString(1), p);
-//			}
-//		}
-//	}
-
 	PreparedStatement ps3b = null;
 	/**
 	 * 
@@ -480,129 +459,136 @@ public class NotesDB {
 	List<AZ> getNotesDBA() throws SQLException {
 		assert dba && !isClosed();
 		List<AZ> azl = new ArrayList<AZ>(10000);
-		if (ps3b==null) ps3b = sqla("a01get2");// con.prepareStatement(""
+		if (ps3b==null) ps3b = sqla("trunkget");// con.prepareStatement(""
 		assert types!=null && types.size()>0 : "note types aren't filled /" + types;
 		ResultSet rs;
 		rs = ps3b.executeQuery();
 		while (rs.next()) {
-			Integer tp = types.get(rs.getString(4));
-			Objects.requireNonNull(tp, String.format("'%s' not mapped to mark", rs.getString(4)));
-			AZ az = new AZ(rs.getInt(12), rs.getString(9), rs.getString(2), tp);
+			int num = rs.getInt(1), ver = rs.getInt(5);
 			com.sap.lpad.Properties p = new com.sap.lpad.Properties();
-			p.setSapNotesNumber(String.valueOf(rs.getInt(12)));
+			p.setSapNotesNumber(""+num);
 			p.setSapNotesKey(rs.getString(2));
 			p.setTitle(rs.getString(3));
 			p.setType(rs.getString(4));
-			p.setVersion(rs.getString(5));
+			p.setVersion(""+ver);
 			p.setPriority(rs.getString(6));
 			p.setCategory(rs.getString(7));
 			p.setReleasedOn(rs.getString(8));
 			p.setComponentKey(rs.getString(9));
 			p.setComponentText(rs.getString(10));
 			p.setLanguage(rs.getString(11));
+			String langMaster = rs.getString(12), askdate = rs.getString(13);
+			Integer tp = types.get(p.getType());
+			Objects.requireNonNull(tp, String.format("'%s' not mapped to mark", p.getType()));
+			AZ az = new AZ(num, p.getComponentKey(), p.getSapNotesKey(), tp);
 			az.mprop = p;
-			az.longTexts = rs.getInt(13);
-			az.swcv = rs.getInt(14);
-			az.sp = rs.getInt(15);
+			az.langMaster = langMaster;
+			az.askdate = askdate;
 			azl.add(az);
 		}
 		return azl;
 	}
 
-	PreparedStatement psPut = null;
-	void putA01(com.sap.lpad.Properties p, Instant n) throws SQLException {
+	private Map<String,PreparedStatement> dbaPs = new HashMap<String,PreparedStatement>();
+	void putA01(com.sap.lpad.Entry en, Instant n) throws SQLException {
 		assert dba && !isClosed();
-		if (psPut==null) psPut = sqla("a01put");//con.prepareStatement("");
-		String askdate = n.toString();
-		psPut.setString(1, askdate);
-		psPut.setInt(2, Integer.parseInt(p.getSapNotesNumber()));
-		psPut.setString(3, p.getSapNotesKey());
-		psPut.setString(4, p.getTitle());
-		psPut.setString(5, p.getType());
-		psPut.setInt(6, Integer.parseInt(p.getVersion()));	// version
-		psPut.setString(7, p.getPriority()); // priority
-		psPut.setString(8, p.getCategory());
-		psPut.setString(9, p.getReleasedOn());
-		psPut.setString(10, p.getComponentKey());
-		psPut.setString(11, p.getComponentText());
-		psPut.setString(12, p.getLanguage());
-		eu = psPut.executeUpdate();
-		assert eu == 1;
-		con.commit();
-	}
+		String pk[] = new String[]{"trunkins", "trunkupd", 
+				"longins", "softcomins", "corrinsins", "spins", "reftoins", "refbyins", "patchins", "attachins",
+				"sidecauins", "sidesolins", "productins"};
 
-	PreparedStatement psPutf = null, psPutSW=null, psPutSp=null;
-	void putFeeds(com.sap.lpad.Properties prop, com.sap.lpad.Feed f, Instant n) throws SQLException {
-		assert dba && !isClosed();
-		if (psPutf==null) psPutf = sqla("long01put");
-		if (psPutSW==null) psPutSW = sqla("sw01put");
-		if (psPutSp==null) psPutSp = sqla("sp01put");
-		String askdate = n.toString();
-		int num = Integer.parseInt(prop.getSapNotesNumber());
-		int ver = Integer.parseInt(prop.getVersion());
-		String lang = prop.getLanguage();
-		
-		psPutf.clearBatch();
-		psPutSW.clearBatch();
-		for (com.sap.lpad.Entry ch: f.getEntry()) {
-			String cas = null;
-//			System.out.println(num + "\t" + ch.getContent().getType());
-			for (Object o: ch.getIdOrLinkOrTitle()) if (o instanceof com.sap.lpad.Link) {
-				cas = ((com.sap.lpad.Link)o).getTitle();
-			}
-/*				if (o instanceof JAXBElement) {
-//					JAXBElement j = (JAXBElement)o;
-//					System.out.println(j.getName() + " " + j.getValue());
-//				} else if (o instanceof com.sap.lpad.Title) {
-//					com.sap.lpad.Title tit = (com.sap.lpad.Title)o;
-//					System.out.println(tit.getContent());
-//				} else if (o instanceof com.sap.lpad.Category) {
-//					com.sap.lpad.Category cat;
-//					cat = (com.sap.lpad.Category)o;
-					System.out.println(cat.getTerm());*/
-			com.sap.lpad.Properties pch = ch.getContent().getProperties();
-			if ("LongText".equals(cas)) {
-				int typekey = Integer.parseInt(pch.getTypeKey());
-				assert typekey > 0;
-				assert lang.equals(pch.getLanguage());
-//				System.out.println(pch.getTypeText());
-//				System.out.println();
-				psPutf.setString(1, askdate);
-				psPutf.setInt(2, num);
-				psPutf.setInt(3, ver);
-				psPutf.setString(4, pch.getLanguage());
-				psPutf.setInt(5, typekey);
-				psPutf.setString(6, pch.getText());
-				psPutf.addBatch();
-			} else if ("SoftCom".equals(cas)) {
-				psPutSW.setString(1, askdate);
-				psPutSW.setInt(2, num);
-				psPutSW.setInt(3, ver);
-				psPutSW.setInt(4, Integer.parseInt(pch.getPakId()));
-				psPutSW.setInt(5, Integer.parseInt(pch.getAleiKey()));
-				psPutSW.setString(6, pch.getName());
-				psPutSW.setString(7, pch.getVerFrom());
-				psPutSW.setString(8, pch.getVerTo());
-				psPutSW.addBatch();
-			} else if ("SpPatch".equals(cas)) {
-				psPutSp.setString(1, askdate);
-				psPutSp.setInt(2, num);
-				psPutSp.setInt(3, ver);
-				psPutSp.setString(4, pch.getName());
-				psPutSp.setString(5, pch.getSp());
-				psPutSp.setString(6, pch.getLevel());
-				psPutSp.addBatch();
-			} else {
-				System.err.println("CAS=" + cas);
-				System.exit(-1);
+		if (dbaPs.size()==0) for (String s: pk) dbaPs.put(s, sqla(s));
+		com.sap.lpad.Properties p, pML=null, q; 
+		p = en.getContent().getProperties();
+
+		for (PreparedStatement ps: dbaPs.values()) ps.clearBatch();
+		List<Entry<String,Object[]>> todo = new ArrayList<Entry<String,Object[]>>();
+		StringJoiner facets = new StringJoiner(",");
+		Object o[];
+		for (com.sap.lpad.Link l: en.getLink()) {
+			if ("self".equals(l.getRel())) continue;
+			List<com.sap.lpad.Entry> ex = l.getInline().getFeed().getEntry();
+			assert ex!=null;
+			facets.add(l.getTitle());
+			for (com.sap.lpad.Entry eo: ex) {
+				q = eo.getContent().getProperties();
+				switch (l.getTitle()) {
+				case "Languages":
+					pML = q;
+					break;
+				case "LongText":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),q.getLanguage(),Integer.parseInt(q.getVersion()),
+						q.getTypeKey(), q.getText()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("longins", o));
+					break;
+				case "RefTo":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("reftoins", o));
+					break;
+				case "RefBy":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("refbyins", o));
+					break;
+				case "Sp":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+						q.getName(), q.getSp(), q.getVersion()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("spins", o));
+					break;
+				case "SideSol":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("sidesolins", o));
+					break;
+				case "SideCau":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("sidecauins", o));
+					break;
+				case "Attach":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getFileName(), q.getFileSize(), q.getFileLink(), q.getMimeType()};
+						todo.add(new AbstractMap.SimpleEntry<String,Object[]>("attachins", o));
+						break;
+				case "SoftCom":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							Integer.parseInt(q.getPakId()), Integer.parseInt(q.getAleiKey()), 
+							q.getName(), q.getVerFrom(), q.getVerTo()}; 
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("softcomins", o));
+					break;
+				case "Patch":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getName(), q.getSp(), q.getVersion()};
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("patchins", o));
+					break;
+				case "CorrIns":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							Integer.parseInt(q.getPakId()), q.getName(), Integer.parseInt(q.getCount()) };
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("corrinsins", o));
+					break;
+				case "Product":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getProductKey(), q.getProductName(), q.getProductVersion() };
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("productins", o));
+					break;
+				default:
+					throw new RuntimeException("NIY " + l.getTitle() + " " + ex.size());
+				}
 			}
 		}
-		ia = psPutf.executeBatch();
-		ia = psPutSW.executeBatch();
-		ia = psPutSp.executeBatch();
+		o = new Object[]{n.toString(), Integer.parseInt(p.getSapNotesNumber()), p.getSapNotesKey(), p.getTitle(), p.getType()
+				, Integer.parseInt(p.getVersion()), p.getPriority(), p.getCategory(), p.getReleasedOn(), p.getComponentKey()
+				, p.getComponentText(), p.getLanguage(), pML==null ? null : pML.getLangMaster(), facets.toString()};
+		setPs(dbaPs.get("trunkins"), o).addBatch();
+		o = new Object[]{n.toString(), Integer.parseInt(p.getSapNotesNumber()), p.getLanguage()};
+		setPs(dbaPs.get("trunkupd"), o).addBatch();				
+
+		for (Entry<String,Object[]> e: todo) 
+			setPs(dbaPs.get(e.getKey()), e.getValue()).addBatch();
+		for (String s: pk) dbaPs.get(s).executeBatch();
 		commit();
 	}
-	
+
 	// area-db into notes.db
 	void fromDBAtoCDB(NotesDB dba) throws SQLException {
 		// dba == area db
@@ -738,24 +724,24 @@ public class NotesDB {
 		assert eu>0;
 	}
 	
-	List<Integer> arrrrrrrrrr(List<String> as, String pat) throws SQLException {
-		List<Integer> ar = new ArrayList<Integer>(1000);
-		PreparedStatement ps = sql("03areaunk");
-		ps.setString(1, pat);
-		ResultSet rs = ps.executeQuery();
-		String p = null;
-		while (as.size()>0 && rs.next()) {
-			int num = rs.getInt(1);
-			String t = rs.getString(2);
-			if (p!=t && as.contains(t)) {
-				System.out.println(num + "\t" + t);
-				ar.add(num);
-				as.remove(t);
-				p = t;
-			}
-		}
-		return ar;
-	}
+//	List<Integer> arrrrrrrrrr(List<String> as, String pat) throws SQLException {
+//		List<Integer> ar = new ArrayList<Integer>(1000);
+//		PreparedStatement ps = sql("03areaunk");
+//		ps.setString(1, pat);
+//		ResultSet rs = ps.executeQuery();
+//		String p = null;
+//		while (as.size()>0 && rs.next()) {
+//			int num = rs.getInt(1);
+//			String t = rs.getString(2);
+//			if (p!=t && as.contains(t)) {
+//				System.out.println(num + "\t" + t);
+//				ar.add(num);
+//				as.remove(t);
+//				p = t;
+//			}
+//		}
+//		return ar;
+//	}
 
 	/**
 	 * called from launchpad for <area>.db
@@ -812,5 +798,4 @@ public class NotesDB {
 		assert eu==1;
 		commit();
 	}
-	
 }

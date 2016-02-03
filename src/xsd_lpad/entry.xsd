@@ -3,22 +3,22 @@
   <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices" schemaLocation="d.xsd"/>
   <xs:import namespace="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata" schemaLocation="m.xsd"/>
   <xs:import namespace="http://www.w3.org/XML/1998/namespace" schemaLocation="xml.xsd"/>
-  <xs:element name="entry">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:choice minOccurs="0" maxOccurs="unbounded">
-          <xs:element ref="atom:id"/>
-          <xs:element ref="atom:link"/>
-          <xs:element ref="atom:title"/>
-          <xs:element ref="atom:updated"/>
-          <xs:element ref="atom:category"/>
-        </xs:choice>
-        <xs:element ref="atom:content"/>
-      </xs:sequence>
-      <xs:attribute ref="xml:base"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="category">
+  
+	<xs:complexType name="Entry">
+		<xs:sequence>
+			<xs:element ref="atom:id" maxOccurs="1"/>
+			<xs:element ref="atom:title" maxOccurs="1"/>
+			<xs:element ref="atom:updated" maxOccurs="1"/>
+			<xs:element ref="atom:category" maxOccurs="1"/>
+			<xs:element ref="atom:link" minOccurs="0" maxOccurs="unbounded"/>
+			<xs:element ref="atom:content" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+		<!--xs:attribute ref="xml:base"/-->
+	</xs:complexType>
+		
+	<xs:element name="entry" type="atom:Entry"/>
+
+	<xs:element name="category">
     <xs:complexType>
       <xs:attribute name="scheme" use="required" type="xs:string"/>
       <xs:attribute name="term" use="required"/>

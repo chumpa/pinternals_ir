@@ -40,6 +40,17 @@
     		
     		<xs:element ref="d:Sp"/>
     		<xs:element ref="d:Level"/>
+
+    		<xs:element ref="d:Count"/>
+    		
+    		<xs:element ref="d:FileName"/>
+    		<xs:element ref="d:FileSize"/>
+    		<xs:element ref="d:FileLink"/>
+    		<xs:element ref="d:MimeType"/>
+    		
+    		<xs:element ref="d:ProductKey"/>
+    		<xs:element ref="d:ProductName"/>
+    		<xs:element ref="d:ProductVersion"/>
     		
     	</xs:all>
       <!--xs:sequence>

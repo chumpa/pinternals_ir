@@ -4,22 +4,18 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
-import java.text.ParseException;
-import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -27,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.StringJoiner;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -320,8 +317,8 @@ class NoteA {
 }
 
 class AZ{
-	int num, mark, longTexts=0, swcv=0, sp=0;
-	String area, askdate=null, objid=null;
+	int num, mark; //, longTexts=0, swcv=0, sp=0;
+	String area, askdate=null, objid=null, langMaster=null;
 	com.sap.lpad.Properties mprop=null;
 	
 	@Override
@@ -369,104 +366,66 @@ class AZ{
 	 * @param debug
 	 * @throws IOException
 	 */
-	static com.sap.lpad.Entry downloadEntry(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {
-    	Path ph = Cache.fs.getPath(String.format("errorEntry_%010d.html", num));
-		URL u = null;
-		if (mark==NotesDB.SAP_KBA) {
-			u = Launchpad.getByScheme(EScheme.KBA, lang, num, ver);
-		} else {
-			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver);
-		}
-		Page o = wc.getPage(u);
-		WebResponse wr = o.getWebResponse();
-		int rc = wr.getStatusCode();
-		com.sap.lpad.Entry en;
-		if (rc>399) {
-	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
-	    	throw ne;
-		} else if (debug) {
-			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry.xml", num, lang, ver));
-			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
-		} else {
-			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
-		}
-		return en;
-	}
+//	static com.sap.lpad.Entry downloadEntry(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {
+//    	Path ph = Cache.fs.getPath(String.format("errorEntry_%010d.html", num));
+//		URL u = null;
+//		if (mark==NotesDB.SAP_KBA) {
+//			u = Launchpad.getByScheme(EScheme.KBA, lang, num, ver);
+//		} else {
+//			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver);
+//		}
+//		Page o = wc.getPage(u);
+//		WebResponse wr = o.getWebResponse();
+//		int rc = wr.getStatusCode();
+//		com.sap.lpad.Entry en;
+//		if (rc>399) {
+//	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+//	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
+//	    	throw ne;
+//		} else if (debug) {
+//			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry.xml", num, lang, ver));
+//			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+//			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
+//		} else {
+//			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
+//		}
+//		return en;
+//	}
 
-	static com.sap.lpad.Entry downloadEntry2(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ...args) throws IOException, NoteRetrException {
-    	Path ph = Cache.fs.getPath(String.format("errorEntry_%010d.html", num));
-		URL u = null;
-		if (mark==NotesDB.SAP_KBA) {
-			u = Launchpad.getByScheme2(EScheme.KBA, lang, num, ver, args);
-		} else {
-			u = Launchpad.getByScheme2(EScheme.Corr, lang, num, ver, args);
-		}
-		Page o = wc.getPage(u);
-		WebResponse wr = o.getWebResponse();
-		int rc = wr.getStatusCode();
-		com.sap.lpad.Entry en;
-		if (rc>399) {
-	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
-	    	throw ne;
-		} else if (debug) {
-			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry.xml", num, lang, ver));
-			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
-		} else {
-			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
-		}
-		return en;
-	}	
+
 	/**
 	 * downloads main entry, with no feeds
 	 * @param wc
 	 * @param debug
 	 * @throws IOException
 	 */
-	static com.sap.lpad.Feed downloadFeeds(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ... args) throws IOException, NoteRetrException {
-    	Path ph = Cache.fs.getPath(String.format("errorFeeds_%010d.html", num));
-		URL u = null;
-		if (mark==NotesDB.SAP_KBA) {
-			u = Launchpad.getByScheme(EScheme.KBA, lang, num, ver, args);
-		} else {
-			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver, args);
-		}
-		if (debug) System.out.println(u);
-		Page o = wc.getPage(u);
-		WebResponse wr = o.getWebResponse();
-		int rc = wr.getStatusCode();
-		com.sap.lpad.Feed fd;
-		System.out.println(rc);
-		if (rc>399) {
-	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
-	    	throw ne;
-		} else if (debug) {
-			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_feed.xml", num, lang, ver));
-			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
-			fd = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Feed.class);
-		} else {
-			fd = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Feed.class);
-		}
-		return fd;
-	}
-	
-	// ------------------------------------------------------------	
-	//	String ;
-	//	String areadescr, dateS, lang, , objid2=null;
-	//	
-	//	String title, type, priority, category, newVers, newReleasedOn;
-	//	class Version {
-	//		int ver;
-	//		String releasedon, isinternal;
-	//		Version(int a, String b) {
-	//			ver = a;
-	//			releasedon = b;
-	//		}
-	//	}
+//	static com.sap.lpad.Feed downloadFeeds(WebClient wc, int num, String lang, int ver, int mark, boolean debug, String ... args) throws IOException, NoteRetrException {
+//    	Path ph = Cache.fs.getPath(String.format("errorFeeds_%010d.html", num));
+//		URL u = null;
+//		if (mark==NotesDB.SAP_KBA) {
+//			u = Launchpad.getByScheme(EScheme.KBA, lang, num, ver, args);
+//		} else {
+//			u = Launchpad.getByScheme(EScheme.Corr, lang, num, ver, args);
+//		}
+//		if (debug) System.out.println(u);
+//		Page o = wc.getPage(u);
+//		WebResponse wr = o.getWebResponse();
+//		int rc = wr.getStatusCode();
+//		com.sap.lpad.Feed fd;
+//		System.out.println(rc);
+//		if (rc>399) {
+//	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+//	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
+//	    	throw ne;
+//		} else if (debug) {
+//			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_feed.xml", num, lang, ver));
+//			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+//			fd = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Feed.class);
+//		} else {
+//			fd = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Feed.class);
+//		}
+//		return fd;
+//	}
 }
 
 public class Launchpad {
@@ -947,48 +906,25 @@ public class Launchpad {
 	}
 	
 	public static void main(String args[]) throws Exception {
-		WebClient wc = null;
-	    Instant th = Instant.now(), t2 = th, t3;
-	    int nums[] = new int[]{};
-	    Path p;
-	    for (int num: nums) {
-	    	if (wc==null) wc = Launchpad.getLaunchpad("s0000000000", null, null);
-	    	p = Cache.fs.getPath("tmp", String.format("%010d.xml", num));
-	    	BufferedWriter w = Files.newBufferedWriter(p, utf8);
-	    	URL u = getByScheme("E", num, 0);
-	    	System.out.println(u);
-	    	Page o = wc.getPage(u);
-	    	WebResponse wr = o.getWebResponse();
-	    	int rc = wr.getStatusCode();
-	    	System.out.println(o);
-	    	if (o instanceof XmlPage) {
-//	    		XmlPage xm = (XmlPage)o; 
-		    	w.write(wr.getContentAsString());
-		    	w.flush();
-		    	w.close();
-		    	if (rc>=200 && rc<=299) {
-		    		com.sap.lpad.Entry en = JAXB.unmarshal(p.toFile(), com.sap.lpad.Entry.class);
-		    		System.out.println(en.getContent().getProperties().getType());
-		    	} else {
-		    		System.err.println(wr.getStatusMessage());
-		    	}
-	    	} else
-	    		throw new RuntimeException(o.toString());
-	    	t3 = Instant.now();
-	    	t2 = t3;
-	    }
-	    System.out.println(String.format("%nAverage is %s / %d", Duration.between(t2, th), nums.length));
-	    p = Cache.fs.getPath("tmp", "0001381198.xml");
-	    com.sap.lpad.Entry en = JAXB.unmarshal(p.toFile(), com.sap.lpad.Entry.class);
-	    com.sap.lpad.Properties r = en.getContent().getProperties();
-	    System.out.println(r.getVersion());
-	    String x = DateTimeFormatter.ISO_LOCAL_DATE_TIME.format(LocalDateTime.ofInstant(Instant.now(), ZoneId.systemDefault()));
-	    System.out.println(x);
-	    x = Instant.now().toString();
-	    System.out.println(x);
-	    
-	    //https://websmp110.sap-ag.de/~form/handler?_APP=00200682500000002095&_EVENT=DISPL_MAIN&_COMP=
-	    if (wc!=null) wc.close();
+		DirectoryStream<Path> ds = Files.newDirectoryStream(FileSystems.getDefault().getPath("."), "*_entryfacets.xml");
+		Iterator<Path> it = ds.iterator();
+		String s, ml;
+		while (it.hasNext()) {
+			Path p = it.next();
+			com.sap.lpad.Entry en = JAXB.unmarshal(Files.newInputStream(p), com.sap.lpad.Entry.class);
+			com.sap.lpad.Properties prop = en.getContent().getProperties();
+			System.out.println(String.format("%s:\t%s%n%s", p, en.getId(), prop.getSapNotesKey()));
+			ml = null;
+			for (com.sap.lpad.Link l: en.getLink()) if (!l.getRel().equals("self")) {
+				s = l.getTitle();
+				System.out.println(String.format("%s %s  ", s, l.getInline().getFeed().getEntry()));
+				for (com.sap.lpad.Entry en2: l.getInline().getFeed().getEntry()) {
+					if ("Languages".equals(s)) ml = en2.getContent().getProperties().getLangMaster(); 
+//					System.out.println(en2.getContent().getProperties());
+				}
+			}
+			System.out.println(ml);
+		}
 	}
 	void close() {
 		if (wc!=null) wc.close();
@@ -1008,13 +944,14 @@ public class Launchpad {
 		System.out.println(dba.getNick());
 		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
 		List<AZ> azs = cdb.getNotesCDB_byAreas(areas), ozs = dba.getNotesDBA();
+
+		azs.sort(Comparator.comparing(o1->-o1.num));
 		boolean needmore = false, e;
 		Instant n;
 		for (AZ x: azs) { // every x.num occurs at `azs` once
 			assert x.num>0 && x.mark>=0 && x.objid!=null && x.area!=null && x.mprop==null;
 			e = true;
 			com.sap.lpad.Entry en = null;
-			com.sap.lpad.Feed fd = null;
 			// many y.num may occurs at `ozs`. The unique key is num-version-language
 			for (AZ y: ozs) if (x.num==y.num) {
 				assert y.num>0 : y.num;
@@ -1022,9 +959,8 @@ public class Launchpad {
 				assert y.objid!=null : y.objid;
 				assert y.area!=null : y.area;
 				assert y.mprop!=null : y.mprop;
-				e = false;
-				int ver = Integer.parseInt(y.mprop.getVersion());
-				int mark = NotesDB.types.get(y.mprop.getType());
+//				int ver = Integer.parseInt(y.mprop.getVersion());
+//				int mark = NotesDB.types.get(y.mprop.getType());
 				if (x.mark!=y.mark) { 
 					assert x.mark==0 : x.num;
 					System.out.println(String.format("Note %s has to be turned to mark=%d", x.num, y.mark));
@@ -1037,82 +973,88 @@ public class Launchpad {
 					cdb.setObjid(x.num, y.objid);
 					x.objid = y.objid;
 				}
-				// check if title and version are exists at CDB
-				System.out.println(y.num + "\t" + y.mprop.getType() + "\t" + y.longTexts + "\t" + y.swcv + "\t" + y.sp);
-				if (y.longTexts<2 && !y.secnote()) {
-					if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-					try {
-						n = Instant.now();
-						fd = AZ.downloadFeeds(wc, x.num, y.mprop.getLanguage(), ver, mark, debug, "LongText");
-						dba.putFeeds(y.mprop, fd, n);
-					} catch (NoteRetrException nre) {
-						System.err.println(nre.errText);
-						e = false;
-					}
-				}
-				if (y.swcv==0) {
-					if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-					try {
-						n = Instant.now();
-						fd = AZ.downloadFeeds(wc, x.num, y.mprop.getLanguage(), ver, mark, debug, "SoftCom");
-						dba.putFeeds(y.mprop, fd, n);
-					} catch (NoteRetrException nre) {
-						System.err.println(nre.errText);
-						e = false;
-						throw new RuntimeException(nre);
-					}
-				}
-				if (y.sp==0) {
-					if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-					try {
-						n = Instant.now();
-						fd = AZ.downloadFeeds(wc, x.num, y.mprop.getLanguage(), ver, mark, debug, "Sp");
-						dba.putFeeds(y.mprop, fd, n);
-					} catch (NoteRetrException nre) {
-						System.err.println(nre.errText);
-						e = false;
-						throw new RuntimeException(nre);
-					}
-				}
-				
+				e = false;
 			} // for (y: ozs) if x.num==y.num
-			if (e) {
-				// exists at CDB, not exists at DBA
-				// neet to download at least 
-				System.out.println("Need to download unknown note: " + x.num);
-				if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-				try {
-					n = Instant.now();
-					en = AZ.downloadEntry2(wc, x.num, "E", 0, x.mark, debug, "LongText", "Languages");
-					dba.putA01(en.getContent().getProperties(), n);
-//					int ver = Integer.parseInt(en.getContent().getProperties().getVersion());
-//					int mark = NotesDB.types.get(en.getContent().getProperties().getType());
-				} catch (NoteRetrException nre) {
-					if (nre.notreleased) System.err.println("Not released yet: " + x.num);
-					e = false;
-				}
+			if (!e) continue;
+			System.out.println("Need to download note: " + x.num);
+			if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+			//TODO detect languages 
+			try {
+				n = Instant.now();
+				en = downloadEntry2(wc, x.num, "E", 0, x.mark, debug);
+				dba.putA01(en, n);
+			} catch (NoteRetrException nre) {
+				if (nre.notreleased) System.err.println("Not released yet: " + x.num);
+				e = false;
 			}
-			needmore = needmore || e;
+			needmore = true;
 		}
 		return needmore;
-		// completely unknown notes -- need to download
-//		
-		// TODO look for stored archive
-//				
-//		try {
-//			
-//			
-//		} catch (NoteRetrException nre) {
-//			
-//		}
-//		System.out.println(azs);
-//		System.out.println(ozs);
-//		System.out.println("d2:"+d2);
-//		System.out.println("d3:"+d3);
-//		cdb.getZ3();
-//		cdb.getZ3(area)
+	}
+	void importNote(NotesDB dba, InputStream is) throws IOException, SQLException {
+		com.sap.lpad.Entry enbig = JAXB.unmarshal(is, com.sap.lpad.Entry.class);
+		dba.putA01(enbig, Instant.now());
 	}
 	
+	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {
+    	Path ph = null, pg;
+    	String b;
+		URL u = null;
+		if (mark==NotesDB.SAP_KBA) {
+			b = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
+					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
+		} else {//if (mark!=NotesDB.SAP_SECNOTE){
+			b = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
+					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
+		} //else throw new RuntimeException(String.format("Security note download is not implemented yet: %010d %s v%d", num, lang, ver));
+		u = new URL(b + "?$expand=Languages");
+		Page o = wc.getPage(u);
+		WebResponse wr = o.getWebResponse();
+		int rc = wr.getStatusCode();
+		com.sap.lpad.Entry en, enbig;
+		if (rc>399) {
+			ph = Cache.fs.getPath(String.format("errorEntry_%010d_main.xml", num));
+	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
+	    	throw ne;
+		} else if (debug) {
+			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry1.xml", num, lang, ver));
+			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
+		} else {
+			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
+		}
+		assert (en!=null);
+		StringJoiner facets = new StringJoiner(",");
+		String masterLang = null;
+		for (com.sap.lpad.Link l: en.getLink()) if (!"self".equals(l.getRel())) {
+			facets.add(l.getTitle());
+			if (l.getInline()!=null)
+				if (l.getInline().getFeed()!=null && l.getInline().getFeed().getEntry()!=null && l.getInline().getFeed().getEntry().size()>0)
+				if (l.getTitle().equals("Languages") ) masterLang = l.getInline().getFeed().getEntry().get(0).getContent().getProperties().getLangMaster();
+		}
+//		assert lang.equals(masterLang) : String.format("for note %010d asked lang %s instead of %s", num, lang, masterLang);
+//		assert "DEJ".contains(masterLang);
+		u = new URL(b + "?$expand=" + facets);
+		System.out.println(u);
+		o = wc.getPage(u);
+		wr = o.getWebResponse();
+		rc = wr.getStatusCode();
+		if (rc>399) {
+			pg = Cache.fs.getPath(String.format("errorEntry_%010d_facets.xml", num));
+	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(pg));
+	    	NoteRetrException ne = new NoteRetrException(pg, u, rc);
+	    	throw ne;
+		} else if (debug) {
+			pg = Cache.fs.getPath(String.format("%010d_%s_v%d_entryfacets.xml", num, lang, ver));
+			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(pg));
+			enbig = JAXB.unmarshal(Files.newInputStream(pg), com.sap.lpad.Entry.class);
+			Files.delete(ph);
+		} else {
+			enbig = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
+		}
+		return enbig;
+	}	
 	/**
 	 * checks tmpdir for previously cached notes (zip-archives)
 	 * @param dba <area>.db for one nick
@@ -1161,20 +1103,6 @@ public class Launchpad {
 			System.out.println();
 		}
 	}
-	
-	/**
-	 * completely new notes
-	 * @param nc
-	 * @param dba
-	 * @throws IOException
-	 * @throws SQLException
-	 */
-	private void downloadNotes(Collection<AZ> nc, NotesDB dba, boolean debug) throws IOException, SQLException {
-
-	}
-	
-	
-	
 }
 
 /*
