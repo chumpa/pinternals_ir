@@ -193,13 +193,13 @@ public class NotesRetriever {
 					assert as>1;
 					l = new Launchpad(cache);
 					l.areaList(db);
-					Iterator<Path> it = Files.newDirectoryStream(FileSystems.getDefault().getPath("."), "000*_entryfacets.xml").iterator();
-					while (it.hasNext()) {
-						Path p = it.next();
-						for (NotesDB dba: l.dbas) {
-							String nick = dba.getNick();
-							if (args.contains(nick)) {
-								System.out.println(p);
+					for (NotesDB dba: l.dbas) {
+						String nick = dba.getNick();
+						if (args.contains(nick)) {
+							Path facets = dba.pathdb.resolve("../facets").normalize(), p;
+							Iterator<Path> it = Files.newDirectoryStream(facets, "000*_entryfacets.xml").iterator();						
+							while (it.hasNext()) {
+								p = it.next();
 								l.importNote(dba, Files.newInputStream(p));
 							}
 						}

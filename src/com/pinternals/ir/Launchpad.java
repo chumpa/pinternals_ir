@@ -15,7 +15,6 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -44,6 +43,7 @@ import com.gargoylesoftware.htmlunit.NicelyResynchronizingAjaxController;
 import com.gargoylesoftware.htmlunit.Page;
 import com.gargoylesoftware.htmlunit.SgmlPage;
 import com.gargoylesoftware.htmlunit.SilentCssErrorHandler;
+import com.gargoylesoftware.htmlunit.TextPage;
 import com.gargoylesoftware.htmlunit.WebClient;
 import com.gargoylesoftware.htmlunit.WebResponse;
 import com.gargoylesoftware.htmlunit.html.HtmlButton;
@@ -66,17 +66,46 @@ import com.sap2.CWBNTVALID;
 
 class NoteRetrException extends RuntimeException {
 	private static final long serialVersionUID = 9041797099776264027L;
-	final static String nry = "This note has not been released";	    	
-	boolean notreleased = false;
-	String errText = null;
+	final static String nry = "This note has not been released"
+			, interrorCode1 = "HTTP/500/E/Internal Server Error"
+			, interrorCode2 = "In the context of Data Services an unknown internal server error occured";	    	
+	boolean notreleased = false, internalerror;
+	String errText = null, errCode;
 	URL url = null;
 	int rc = 0;
 
 	NoteRetrException(Path ph, URL u, int rc) throws IOException {
+		System.err.println(String.format("HTTP error %d when ask %s", rc, u));
+		/* there are 4 error rezults, look at `ph':
+		 1. Text asnwer: "An existing connection was forcibly closed by the remote host" or "An existing connection was forcibly closed by backend .."
+		 2. html-answer:
+	<html><head><title>Error report</title></head><body><h1>HTTP Status 500 - An internal application error occurred.Request: 137724313 supportportal:supportshell</h1></body></html>
+		 3. xml-answer by Abap:
+	<?xml..?><error><code>HTTP/500/E/Internal Server Error</code>
+	  <message>The following error text was processed in system W72 : http://service.sap.com/sap/support/notes/821267 cannot be interpreted as a number</message></error>	 
+		 4. xml-answer by OData:
+	<?xml..?><error xmlns="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">....</error>	  
+		*/
+		
+		// for OData-style errors
 		com.sap.err.Error error = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
-		this.errText = error.getMessage().getContent();
+		// for internal errors
+		com.sap.lpad.Error err2 = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Error.class);
+		assert error!=null&&err2!=null;
+		
+//		System.err.println(error + "\t" + error.getCode());
+//		System.err.println(err2 + "\t" + err2.getCode());
+		if (err2.getCode()!=null) {
+			this.errCode = err2.getCode();
+			internalerror = interrorCode1.equals(errCode);
+			this.errText = err2.getMessage();
+		} else if (error.getCode()!=null) {
+			this.errText = error.getMessage().getContent();
+			notreleased = rc==400 & nry.equals(errText);
+			internalerror = interrorCode2.equals(this.errText);
+			System.err.println(this.errText);
+		}
 		this.url = u;
-		notreleased = rc==400 & nry.equals(errText);
 		this.rc = rc;
 //		throw new RuntimeException(String.format("Failed (rc=%d) to get %s, look at %s%n%s - %s", rc, u, ph, error.getCode(), error.getMessage().getContent()));
 	}
@@ -892,17 +921,25 @@ public class Launchpad {
 	    textField2.setValueAttribute(passwd);
 	    List<HtmlElement> buttons = form.getElementsByAttribute("button", "type", "submit");
 	    HtmlButton button = (HtmlButton)buttons.get(0);
-	    SgmlPage o = button.click();
-	    int rc = o.getWebResponse().getStatusCode();
-	    webClient.getOptions().setJavaScriptEnabled(false);
-	    webClient.getOptions().setCssEnabled(false);
-	    if (rc>399) {
-	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(Cache.fs.getPath("Launchpad_login_error.html")));
-		    throw new RuntimeException(String.format("Failed (rc=%d) when log on to %s, see Launchpad_login_error.html", rc, ln));
-	    }
-	    assert o instanceof XmlPage : o;
-	    passwd = null;
-	    return webClient;
+	    Page p = button.click();
+	    if (p instanceof SgmlPage) {
+		    SgmlPage o = (SgmlPage)p;
+		    int rc = o.getWebResponse().getStatusCode();
+		    webClient.getOptions().setJavaScriptEnabled(false);
+		    webClient.getOptions().setCssEnabled(false);
+		    if (rc>399) {
+		    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(Cache.fs.getPath("Launchpad_login_error.html")));
+			    throw new RuntimeException(String.format("Failed (rc=%d) when log on to %s, see Launchpad_login_error.html", rc, ln));
+		    }
+		    assert o instanceof XmlPage : o;
+		    passwd = null;
+		    return webClient;
+	    } else if (p instanceof TextPage) {
+	    	TextPage tp = (TextPage)p;
+	    	System.err.println("Unexpected answer: " + tp.getContent());
+	    	throw new RuntimeException();
+	    } else
+	    	throw new RuntimeException("Unpredicted: " + p);
 	}
 	
 	public static void main(String args[]) throws Exception {
@@ -945,7 +982,7 @@ public class Launchpad {
 		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
 		List<AZ> azs = cdb.getNotesCDB_byAreas(areas), ozs = dba.getNotesDBA();
 
-		azs.sort(Comparator.comparing(o1->-o1.num));
+//		azs.sort(Comparator.comparing(o1->-o1.num));
 		boolean needmore = false, e;
 		Instant n;
 		for (AZ x: azs) { // every x.num occurs at `azs` once
@@ -976,18 +1013,23 @@ public class Launchpad {
 				e = false;
 			} // for (y: ozs) if x.num==y.num
 			if (!e) continue;
-			System.out.println("Need to download note: " + x.num);
+			System.out.print("Need to download note: " + x.num);
 			if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
 			//TODO detect languages 
 			try {
 				n = Instant.now();
 				en = downloadEntry2(wc, x.num, "E", 0, x.mark, debug);
 				dba.putA01(en, n);
+//				needmore = true;
+				System.out.println(" ok");
 			} catch (NoteRetrException nre) {
-				if (nre.notreleased) System.err.println("Not released yet: " + x.num);
-				e = false;
+				if (nre.notreleased) 
+					System.out.println("\tNot released yet: " + x.num);
+				else if (nre.internalerror) 
+					System.out.println("\tInternal error: " + x.num);
+				else
+					System.out.println("\tUNKNOWN: " + x.num);
 			}
-			needmore = true;
 		}
 		return needmore;
 	}
@@ -1008,18 +1050,24 @@ public class Launchpad {
 					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
 		} //else throw new RuntimeException(String.format("Security note download is not implemented yet: %010d %s v%d", num, lang, ver));
 		u = new URL(b + "?$expand=Languages");
-		Page o = wc.getPage(u);
-		WebResponse wr = o.getWebResponse();
-		int rc = wr.getStatusCode();
 		com.sap.lpad.Entry en, enbig;
+		Page o = null;
+		WebResponse wr = null;
+		int rc=500, ma=2;
+		while (rc>=500 && --ma>0) {
+			o = wc.getPage(u);
+			wr = o.getWebResponse();
+			rc = wr.getStatusCode();
+		}
+		assert wr!=null;// && ma>0;
 		if (rc>399) {
 			ph = Cache.fs.getPath(String.format("errorEntry_%010d_main.xml", num));
-	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+	    	IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(ph));
 	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
 	    	throw ne;
 		} else if (debug) {
 			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry1.xml", num, lang, ver));
-			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(ph));
+			IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(ph));
 			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
 		} else {
 			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
@@ -1036,18 +1084,22 @@ public class Launchpad {
 //		assert lang.equals(masterLang) : String.format("for note %010d asked lang %s instead of %s", num, lang, masterLang);
 //		assert "DEJ".contains(masterLang);
 		u = new URL(b + "?$expand=" + facets);
-		System.out.println(u);
-		o = wc.getPage(u);
-		wr = o.getWebResponse();
-		rc = wr.getStatusCode();
+		rc = 500;
+		ma = 2;
+		while (rc>=500 && --ma>0) {
+			o = wc.getPage(u);
+			wr = o.getWebResponse();
+			rc = wr.getStatusCode();
+		}
+		assert wr!=null; // && ma>0;
 		if (rc>399) {
 			pg = Cache.fs.getPath(String.format("errorEntry_%010d_facets.xml", num));
-	    	IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(pg));
+	    	IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(pg));
 	    	NoteRetrException ne = new NoteRetrException(pg, u, rc);
 	    	throw ne;
 		} else if (debug) {
 			pg = Cache.fs.getPath(String.format("%010d_%s_v%d_entryfacets.xml", num, lang, ver));
-			IOUtils.copy(o.getWebResponse().getContentAsStream(), Files.newOutputStream(pg));
+			IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(pg));
 			enbig = JAXB.unmarshal(Files.newInputStream(pg), com.sap.lpad.Entry.class);
 			Files.delete(ph);
 		} else {
