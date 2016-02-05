@@ -19,7 +19,6 @@ import java.util.Map.Entry;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
-import java.util.StringJoiner;
 
 import org.apache.commons.lang3.StringEscapeUtils;
 
@@ -490,7 +489,7 @@ public class NotesDB {
 	}
 
 	private Map<String,PreparedStatement> dbaPs = new HashMap<String,PreparedStatement>();
-	void putA01(com.sap.lpad.Entry en, Instant n) throws SQLException {
+	void putA01(com.sap.lpad.Entry en, Instant n, boolean commit) throws SQLException {
 		assert dba && !isClosed();
 		String pk[] = new String[]{"trunkins", 
 				"longins", "softcomins", "corrinsins", "spins", "reftoins", "refbyins", "patchins", "attachins",
@@ -498,12 +497,12 @@ public class NotesDB {
 		if (dbaPs.size()==0) for (String s: pk) dbaPs.put(s, sqla(s));
 		com.sap.lpad.Properties q, p = en.getContent().getProperties();
 
-		for (PreparedStatement ps: dbaPs.values()) ps.clearBatch();
+		if (commit) for (PreparedStatement ps: dbaPs.values()) ps.clearBatch();
 		List<Entry<String,Object[]>> todo = new ArrayList<Entry<String,Object[]>>();
 		Object o[];
 		Object[] facets = new Object[]{
-				Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()), n.toString(), 
-				null, null, null, null, null, null, null, null, null, null, null, null  				
+			Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()), n.toString(), 
+			null, null, null, null, null, null, null, null, null, null, null, null  				
 			};
 		
 		for (com.sap.lpad.Link l: en.getLink()) {
@@ -605,7 +604,7 @@ public class NotesDB {
 		for (Entry<String,Object[]> e: todo) 
 			setPs(dbaPs.get(e.getKey()), e.getValue()).addBatch();
 		for (String s: pk) dbaPs.get(s).executeBatch();
-		commit();
+		if (commit) commit();
 	}
 	static private void addFacet(int idxOneBased, Object[] fac) {
 		assert idxOneBased>=5 && idxOneBased<=16;

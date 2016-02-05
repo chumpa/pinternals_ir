@@ -1019,7 +1019,7 @@ public class Launchpad {
 			try {
 				n = Instant.now();
 				en = downloadEntry2(wc, x.num, "E", 0, x.mark, debug);
-				dba.putA01(en, n);
+				dba.putA01(en, n, true);
 //				needmore = true;
 				System.out.println(" ok");
 			} catch (NoteRetrException nre) {
@@ -1033,9 +1033,9 @@ public class Launchpad {
 		}
 		return needmore;
 	}
-	void importNote(NotesDB dba, InputStream is) throws IOException, SQLException {
+	void importNote(NotesDB dba, InputStream is, boolean commit) throws IOException, SQLException {
 		com.sap.lpad.Entry enbig = JAXB.unmarshal(is, com.sap.lpad.Entry.class);
-		dba.putA01(enbig, Instant.now());
+		dba.putA01(enbig, Instant.now(), commit);
 	}
 	
 	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {

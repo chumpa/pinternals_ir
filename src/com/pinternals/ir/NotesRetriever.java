@@ -70,7 +70,7 @@ public class NotesRetriever {
 				+ "Launchpad.support.sap.com commands are:\n" 
 				+ "LPAD.SYNC                    mutual sync <area>.db with notes.db\n"
 				+ "LPAD.GETNOTES [nick] ...     {online} ask unknown application areas\n"
-//				+ "LPAD.IMPORT                  import from <area>.db into notes.db\n"
+				+ "LPAD.IMPORT [nick] ...       import from <nick>/facets into nick.db\n"
 //				+ "LPAD.DEEP                    {online} ask for notes content\n"
 //				+ "LPAD.Z1 <dba>                {test} z1-test given dba\n"
 //				+ "LPAD.Z2 <dba>                {online,test} z2-test given dba\n"
@@ -178,9 +178,7 @@ public class NotesRetriever {
 					for (NotesDB dba: l.dbas) {
 						String nick = dba.getNick();
 						if (as==1 || args.contains(nick)) {
-							while (l.getNotes(db, dba, cmd.hasOption('d'))) {
-								System.out.println(nick + " passed");
-							}
+							while (l.getNotes(db, dba, cmd.hasOption('d'))) System.out.println(nick + " passed");
 							args.remove(nick);
 						} else {
 							System.err.println(String.format("warn: %s not used", nick));
@@ -197,11 +195,19 @@ public class NotesRetriever {
 						String nick = dba.getNick();
 						if (args.contains(nick)) {
 							Path facets = dba.pathdb.resolve("../facets").normalize(), p;
-							Iterator<Path> it = Files.newDirectoryStream(facets, "000*_entryfacets.xml").iterator();						
+							Iterator<Path> it = Files.newDirectoryStream(facets, "000*_entryfacets.xml").iterator();
+							int i = 0;
 							while (it.hasNext()) {
 								p = it.next();
-								l.importNote(dba, Files.newInputStream(p));
+								l.importNote(dba, Files.newInputStream(p), false);
+								if (++i>999) {
+									System.out.println(i + " commited");
+									dba.commit();
+									i=0;
+								}
 							}
+							System.out.println(i + " commited");
+							dba.commit();
 						}
 					}
 					break;
