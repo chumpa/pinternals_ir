@@ -25,7 +25,7 @@ import com.gargoylesoftware.htmlunit.WebClient;
 public class NotesRetriever {
 //	private static Logger log = Logger.getLogger(NotesRetriever.class.toString());
 	public static final Charset utf8 = Charset.forName("UTF-8");
-	public static final String version = "v0.0.2-beta";
+	public static final String version = "v0.0.2";
 
 	public static void main(String[] argv) throws Exception {
 		Options opts = new Options();
@@ -68,7 +68,7 @@ public class NotesRetriever {
 				+ "SUPP.CACHE                   handle into db\n"
 				+ "\n"
 				+ "Launchpad.support.sap.com commands are:\n" 
-				+ "LPAD.SYNC                    mutual sync <area>.db with notes.db\n"
+//				+ "LPAD.SYNC                    mutual sync <area>.db with notes.db\n"
 				+ "LPAD.GETNOTES [nick] ...     {online} ask unknown application areas\n"
 				+ "LPAD.IMPORT [nick] ...       import from <nick>/facets into nick.db\n"
 //				+ "LPAD.DEEP                    {online} ask for notes content\n"
@@ -132,8 +132,8 @@ public class NotesRetriever {
 			boolean b = false;
 			try {
 				switch (cm) {
-				case "LPAD.SYNC":
-					throw new RuntimeException("Deprecated");
+//				case "LPAD.SYNC":
+//					throw new RuntimeException("Deprecated");
 //					l = new Launchpad(cache, null, null, null);
 //					l.areaList(db);
 //					for (NotesDB dba: l.dbas) db.sync(dba);
@@ -199,7 +199,7 @@ public class NotesRetriever {
 							int i = 0;
 							while (it.hasNext()) {
 								p = it.next();
-								l.importNote(dba, Files.newInputStream(p), false);
+								l.importNote(dba, Files.newInputStream(p));
 								if (++i>999) {
 									System.out.println(i + " commited");
 									dba.commit();

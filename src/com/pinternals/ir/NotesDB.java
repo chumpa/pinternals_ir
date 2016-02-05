@@ -183,12 +183,19 @@ public class NotesDB {
 		return ddlrb.getString(code);
 	}
 	private PreparedStatement sql(String code) throws SQLException {
-		assert code!=null;
+		assert code!=null && !dba;
 		return con.prepareStatement(sqlrb.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 	}
 	private PreparedStatement sqla(String code) throws SQLException {
-		assert code!=null;
-		return con.prepareStatement(sqlab.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
+		assert code!=null && dba;
+		PreparedStatement ps = null;
+		try {
+			ps = con.prepareStatement(sqlab.getString(code), ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
+		} catch (SQLException e) {
+			System.err.println(String.format("SQL Error for '%s'%n%s%n%s", code, sqlab.getString(code), e.getMessage()));
+			throw e;
+		}
+		return ps;
 	}
 	private PreparedStatement setPs(PreparedStatement ps, Object[] args) throws SQLException {
 		assert ps!=null && args!=null && args.length>0;
@@ -476,20 +483,20 @@ public class NotesDB {
 			p.setComponentKey(rs.getString(9));
 			p.setComponentText(rs.getString(10));
 			p.setLanguage(rs.getString(11));
-			String langMaster = rs.getString(12), askdate = rs.getString(13);
+//			String langMaster = rs.getString(12), askdate = rs.getString(13);
 			Integer tp = types.get(p.getType());
 			Objects.requireNonNull(tp, String.format("'%s' not mapped to mark", p.getType()));
 			AZ az = new AZ(num, p.getComponentKey(), p.getSapNotesKey(), tp);
 			az.mprop = p;
-			az.langMaster = langMaster;
-			az.askdate = askdate;
+//			az.langMaster = langMaster;
+//			az.askdate = askdate;
 			azl.add(az);
 		}
 		return azl;
 	}
 
 	private Map<String,PreparedStatement> dbaPs = new HashMap<String,PreparedStatement>();
-	void putA01(com.sap.lpad.Entry en, Instant n, boolean commit) throws SQLException {
+	void putA01(com.sap.lpad.Entry en, Instant n) throws SQLException {
 		assert dba && !isClosed();
 		String pk[] = new String[]{"trunkins", 
 				"longins", "softcomins", "corrinsins", "spins", "reftoins", "refbyins", "patchins", "attachins",
@@ -497,93 +504,100 @@ public class NotesDB {
 		if (dbaPs.size()==0) for (String s: pk) dbaPs.put(s, sqla(s));
 		com.sap.lpad.Properties q, p = en.getContent().getProperties();
 
-		if (commit) for (PreparedStatement ps: dbaPs.values()) ps.clearBatch();
 		List<Entry<String,Object[]>> todo = new ArrayList<Entry<String,Object[]>>();
 		Object o[];
 		Object[] facets = new Object[]{
 			Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()), n.toString(), 
 			null, null, null, null, null, null, null, null, null, null, null, null  				
 			};
-		
+
+		Map<String,Integer> fn = new HashMap<String,Integer>();
+		fn.put("Languages", 5);
+		fn.put("LongText", 6);
+		fn.put("SoftCom", 7);
+		fn.put("Sp", 8);
+		fn.put("Patch", 9);
+		fn.put("CorrIns", 10);
+		fn.put("RefTo", 11);
+		fn.put("RefBy", 12);
+		fn.put("SideSol", 13);
+		fn.put("SideCau", 14);
+		fn.put("Attach", 15);
+		fn.put("Product", 16);
+
+//		int a = fac[idxOneBased-1]==null ? 0 : (Integer)fac[idxOneBased-1];
+//		fac[idxOneBased-1] = new Integer(a+1);
+
 		for (com.sap.lpad.Link l: en.getLink()) {
 			if ("self".equals(l.getRel())) continue;
 			List<com.sap.lpad.Entry> ex = l.getInline().getFeed().getEntry();
 			assert ex!=null;
-//			facets.add(l.getTitle());
+//			System.out.println(l.getTitle());
+			int fx = fn.get(l.getTitle())-1; 
+			facets[fx] = facets[fx]==null ? new Integer(0) : facets[fx]; 
 			for (com.sap.lpad.Entry eo: ex) {
 				q = eo.getContent().getProperties();
+				facets[fx] = new Integer(  ((Integer)facets[fx]).intValue() + 1); 
 				switch (l.getTitle()) {
 				case "Languages":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),q.getLangMaster()};
 						todo.add(new AbstractMap.SimpleEntry<String,Object[]>("langins", o));
-					addFacet(5, facets);
 					break;
 				case "LongText":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),q.getLanguage(),Integer.parseInt(q.getVersion()),
 						q.getTypeKey(), q.getText()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("longins", o));
-					addFacet(6, facets);
 					break;
 				case "SoftCom":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							Integer.parseInt(q.getPakId()), Integer.parseInt(q.getAleiKey()), 
 							q.getName(), q.getVerFrom(), q.getVerTo()}; 
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("softcomins", o));
-					addFacet(7, facets);
 					break;
 				case "Sp":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 						q.getName(), q.getSp(), q.getVersion()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("spins", o));
-					addFacet(8, facets);
 					break;
 				case "Patch":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getName(), q.getSp(), q.getVersion()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("patchins", o));
-					addFacet(9, facets);
 					break;
 				case "CorrIns":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							Integer.parseInt(q.getPakId()), q.getName(), Integer.parseInt(q.getCount()) };
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("corrinsins", o));
-					addFacet(10, facets);
 					break;
 				case "RefTo":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("reftoins", o));
-					addFacet(11, facets);
 					break;
 				case "RefBy":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("refbyins", o));
-					addFacet(12, facets);
 					break;
 				case "SideSol":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("sidesolins", o));
-					addFacet(13, facets);
 					break;
 				case "SideCau":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getRefNum(), q.getRefType(), q.getRefTitle(), q.getRefUrl(), q.getRefKey()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("sidecauins", o));
-					addFacet(14, facets);
 					break;
 				case "Attach":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getFileName(), q.getFileSize(), q.getFileLink(), q.getMimeType()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("attachins", o));
-					addFacet(15, facets);
 					break;
 				case "Product":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
 							q.getProductKey(), q.getProductName(), q.getProductVersion() };
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("productins", o));
-					addFacet(16, facets);
 					break;
 				default:
 					throw new RuntimeException("NIY " + l.getTitle() + " " + ex.size());
@@ -597,20 +611,10 @@ public class NotesDB {
 		setPs(dbaPs.get("trunkins"), o).addBatch();
 		setPs(dbaPs.get("facetins"), facets).addBatch();
 		setPs(dbaPs.get("facetupd"), facets).addBatch();
-		
-//		o = new Object[]{n.toString(), Integer.parseInt(p.getSapNotesNumber()), p.getLanguage()};
-//		setPs(dbaPs.get("trunkupd"), o).addBatch();				
 
 		for (Entry<String,Object[]> e: todo) 
 			setPs(dbaPs.get(e.getKey()), e.getValue()).addBatch();
 		for (String s: pk) dbaPs.get(s).executeBatch();
-		if (commit) commit();
-	}
-	static private void addFacet(int idxOneBased, Object[] fac) {
-		assert idxOneBased>=5 && idxOneBased<=16;
-		assert fac!=null && fac.length==16;
-		int a = fac[idxOneBased-1]==null ? 0 : (Integer)fac[idxOneBased-1];
-		fac[idxOneBased-1] = new Integer(a+1);
 	}
 	// area-db into notes.db
 	void fromDBAtoCDB(NotesDB dba) throws SQLException {

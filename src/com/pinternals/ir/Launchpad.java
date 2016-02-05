@@ -347,7 +347,7 @@ class NoteA {
 
 class AZ{
 	int num, mark; //, longTexts=0, swcv=0, sp=0;
-	String area, askdate=null, objid=null, langMaster=null;
+	String area, objid=null;//, askdate=null, langMaster=null;
 	com.sap.lpad.Properties mprop=null;
 	
 	@Override
@@ -829,44 +829,45 @@ public class Launchpad {
 //		NotesDB dba = NotesDB.openDBA(ap);
 //		deepAreaTest2(db, dba, tmd, online);
 //	}
-	static URL getByScheme(String lang, int num, int ver) throws MalformedURLException {
-		String s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
-			+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
-    	URL u = new URL(s);
-    	return u;
-	}
-	static URL getByScheme(EScheme escheme, String lang, int num, int ver, String ...add) throws MalformedURLException {
-		String s;
-		if (escheme==EScheme.KBA)
-			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
-					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
-		else
-			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
-					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
-		for (String x: add) 
-			s += "/"+x;
-//		if (add!=null && add.length==1) 
-//			s = s+"/"+add[0];
-//			+ "?$expand=LongText,RefBy,RefTo,Languages", num, ver, lang);
-		//SoftCom -- плохо
-//			+ "?$expand=LongText,SoftCom,RefBy,RefTo,Sp,Patch,Attach,CorrIns,SideSol,SideCau,Languages", num, ver, lang);
-    	URL u = new URL(s);
-    	return u;
-	}
-	static URL getByScheme2(EScheme escheme, String lang, int num, int ver, String ...add) throws MalformedURLException {
-		assert add!=null && add.length>0;
-		String s;
-		if (escheme==EScheme.KBA)
-			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
-					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')?$expand=", num, ver, lang);
-		else
-			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
-					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')?$expand=", num, ver, lang);
-		for (String x: add) 
-			s += x+",";
-    	URL u = new URL(s.substring(0, s.length()-1));
-    	return u;
-	}
+
+//	static URL getByScheme(String lang, int num, int ver) throws MalformedURLException {
+//		String s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
+//			+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
+//    	URL u = new URL(s);
+//    	return u;
+//	}
+//	private static URL getByScheme(EScheme escheme, String lang, int num, int ver, String ...add) throws MalformedURLException {
+//		String s;
+//		if (escheme==EScheme.KBA)
+//			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
+//					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
+//		else
+//			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
+//					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
+//		for (String x: add) 
+//			s += "/"+x;
+////		if (add!=null && add.length==1) 
+////			s = s+"/"+add[0];
+////			+ "?$expand=LongText,RefBy,RefTo,Languages", num, ver, lang);
+//		//SoftCom -- плохо
+////			+ "?$expand=LongText,SoftCom,RefBy,RefTo,Sp,Patch,Attach,CorrIns,SideSol,SideCau,Languages", num, ver, lang);
+//    	URL u = new URL(s);
+//    	return u;
+//	}
+//	private static URL getByScheme2(EScheme escheme, String lang, int num, int ver, String ...add) throws MalformedURLException {
+//		assert add!=null && add.length>0;
+//		String s;
+//		if (escheme==EScheme.KBA)
+//			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
+//					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')?$expand=", num, ver, lang);
+//		else
+//			s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
+//					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')?$expand=", num, ver, lang);
+//		for (String x: add) 
+//			s += x+",";
+//    	URL u = new URL(s.substring(0, s.length()-1));
+//    	return u;
+//	}
 	static URL getBySchemeZip(String lang, int num, int ver, String value) throws MalformedURLException {
 		String s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
 				+ "/Zip4SSet(SapNotesNumber='%010d',Version='%04d',Language='%s')%s", num, ver, lang, value);
@@ -980,7 +981,8 @@ public class Launchpad {
 		assert !cdb.isClosed() && !dba.isClosed();
 		System.out.println(dba.getNick());
 		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
-		List<AZ> azs = cdb.getNotesCDB_byAreas(areas), ozs = dba.getNotesDBA();
+		List<AZ> azs = cdb.getNotesCDB_byAreas(areas);
+		List<AZ> ozs = dba.getNotesDBA();
 
 //		azs.sort(Comparator.comparing(o1->-o1.num));
 		boolean needmore = false, e;
@@ -1019,7 +1021,7 @@ public class Launchpad {
 			try {
 				n = Instant.now();
 				en = downloadEntry2(wc, x.num, "E", 0, x.mark, debug);
-				dba.putA01(en, n, true);
+				dba.putA01(en, n);
 //				needmore = true;
 				System.out.println(" ok");
 			} catch (NoteRetrException nre) {
@@ -1029,13 +1031,15 @@ public class Launchpad {
 					System.out.println("\tInternal error: " + x.num);
 				else
 					System.out.println("\tUNKNOWN: " + x.num);
+			} finally {
+				dba.commit();
 			}
 		}
 		return needmore;
 	}
-	void importNote(NotesDB dba, InputStream is, boolean commit) throws IOException, SQLException {
+	void importNote(NotesDB dba, InputStream is) throws IOException, SQLException {
 		com.sap.lpad.Entry enbig = JAXB.unmarshal(is, com.sap.lpad.Entry.class);
-		dba.putA01(enbig, Instant.now(), commit);
+		dba.putA01(enbig, Instant.now());
 	}
 	
 	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {
