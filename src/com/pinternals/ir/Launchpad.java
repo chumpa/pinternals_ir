@@ -75,7 +75,7 @@ class NoteRetrException extends RuntimeException {
 	int rc = 0;
 
 	NoteRetrException(Path ph, URL u, int rc) throws IOException {
-		System.err.println(String.format("HTTP error %d when ask %s", rc, u));
+//		System.er r.println(String.format("HTTP error %d when ask %s", rc, u));
 		/* there are 4 error rezults, look at `ph':
 		 1. Text asnwer: "An existing connection was forcibly closed by the remote host" or "An existing connection was forcibly closed by backend .."
 		 2. html-answer:
@@ -86,24 +86,22 @@ class NoteRetrException extends RuntimeException {
 		 4. xml-answer by OData:
 	<?xml..?><error xmlns="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">....</error>	  
 		*/
-		
 		// for OData-style errors
 		com.sap.err.Error error = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
 		// for internal errors
 		com.sap.lpad.Error err2 = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Error.class);
 		assert error!=null&&err2!=null;
 		
-//		System.err.println(error + "\t" + error.getCode());
-//		System.err.println(err2 + "\t" + err2.getCode());
 		if (err2.getCode()!=null) {
 			this.errCode = err2.getCode();
 			internalerror = interrorCode1.equals(errCode);
-			this.errText = err2.getMessage();
+			this.errText = err2.getMessage().trim();
 		} else if (error.getCode()!=null) {
-			this.errText = error.getMessage().getContent();
+			this.errText = error.getMessage().getContent().trim();
 			notreleased = rc==400 & nry.equals(errText);
 			internalerror = interrorCode2.equals(this.errText);
-			System.err.println(this.errText);
+		} else {
+			assert false;
 		}
 		this.url = u;
 		this.rc = rc;
@@ -651,8 +649,6 @@ public class Launchpad {
 //	    		System.out.println(String.format("%s\t%s", x, y));
 //	    		Area.handleLaunchpad(x, y);
 //	    		Files.delete(tmp);
-//	    	} else {
-//	    		System.err.println(num + "\tHTTP_ERROR:"+rc);
 //	    	}			
 //		}
 //		Area.updateLaunchpad();
@@ -686,8 +682,6 @@ public class Launchpad {
 //				    		System.out.println("\t" + area +"\t"+en.getContent().getProperties().getSapNotesKey()+"\t"+en.getContent().getProperties().getType());
 //				    		dba.put(en.getContent().getProperties(), Instant.now());
 //				    		Files.delete(tmp);
-//				    	} else {
-//				    		System.err.println("\tHTTP_ERROR:"+rc);
 //				    	}
 //					}
 //				}
@@ -725,8 +719,6 @@ public class Launchpad {
 //				    		System.out.println("\t" + area +"\t"+en.getContent().getProperties().getSapNotesKey()+"\t"+en.getContent().getProperties().getType());
 //				    		dba.put(en.getContent().getProperties(), Instant.now());
 //				    		Files.delete(tmp);
-//				    	} else {
-//				    		System.err.println("\tHTTP_ERROR:"+rc);
 //				    	}
 //					} else {
 //						// check for other properties
@@ -975,7 +967,7 @@ public class Launchpad {
 	 * @throws IOException
 	 * @throws SQLException
 	 */
-	boolean getNotes(NotesDB cdb, NotesDB dba, boolean debug) throws IOException, SQLException {
+	boolean getNotes(NotesDB cdb, NotesDB dba, Path facets) throws IOException, SQLException {
 		assert cache!=null && cdb!=null && dba!=null;
 		assert !cdb.dba && dba.dba;
 		assert !cdb.isClosed() && !dba.isClosed();
@@ -991,6 +983,8 @@ public class Launchpad {
 			assert x.num>0 && x.mark>=0 && x.objid!=null && x.area!=null && x.mprop==null;
 			e = true;
 			com.sap.lpad.Entry en = null;
+			int av = 0, av2 = 0;
+			String al = "E", al2 = null;
 			// many y.num may occurs at `ozs`. The unique key is num-version-language
 			for (AZ y: ozs) if (x.num==y.num) {
 				assert y.num>0 : y.num;
@@ -998,8 +992,6 @@ public class Launchpad {
 				assert y.objid!=null : y.objid;
 				assert y.area!=null : y.area;
 				assert y.mprop!=null : y.mprop;
-//				int ver = Integer.parseInt(y.mprop.getVersion());
-//				int mark = NotesDB.types.get(y.mprop.getType());
 				if (x.mark!=y.mark) { 
 					assert x.mark==0 : x.num;
 					System.out.println(String.format("Note %s has to be turned to mark=%d", x.num, y.mark));
@@ -1013,103 +1005,92 @@ public class Launchpad {
 					x.objid = y.objid;
 				}
 				e = false;
-			} // for (y: ozs) if x.num==y.num
+			}
 			if (!e) continue;
-			System.out.print("Need to download note: " + x.num);
+			System.out.println("Need to download note: " + x.num);
+			Path tmp = facets.resolve("tmp" + Instant.now().toEpochMilli());
 			if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
-			//TODO detect languages 
+			n = Instant.now();
+			int stage = 0;
+			com.sap.lpad.Properties p = null;
 			try {
-				n = Instant.now();
-				en = downloadEntry2(wc, x.num, "E", 0, x.mark, debug);
-				dba.putA01(en, n);
-//				needmore = true;
-				System.out.println(" ok");
-			} catch (NoteRetrException nre) {
-				if (nre.notreleased) 
-					System.out.println("\tNot released yet: " + x.num);
-				else if (nre.internalerror) 
-					System.out.println("\tInternal error: " + x.num);
-				else
-					System.out.println("\tUNKNOWN: " + x.num);
-			} finally {
+				stage = 1;
+				en = downloadEntry2(wc, null, x.num, al, av, x.mark, tmp);
+				stage = 2;
+				p = en.getContent().getProperties();
+				av2 = Integer.parseInt( p.getVersion() );
+				al2 = p.getLanguage();
+				en = downloadEntry2(wc, en, x.num, al2, av2, x.mark, tmp);
+				stage = 3;
+				dba.putA01(en);
+				p = en.getContent().getProperties();
+				dba.putA02(Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()), n, al, av, null, null);
 				dba.commit();
+				Path xd = facets.resolve(String.format("%010d_%s_%d.xml", x.num, al2, av2));
+				Files.move(tmp, xd);
+			} catch (NoteRetrException nre) {
+				assert stage==1||stage==2 : stage;
+				if (stage==2) {
+					// av2, al2 - заполнены
+					dba.putA02(x.num, al2, av2, n, al, av, nre.rc, nre.errText);
+					dba.commit();
+					Files.delete(tmp);
+				} else {
+					dba.putA02(x.num, al, av, n, null, null, nre.rc, nre.errText);
+					dba.commit();
+					Files.delete(tmp);
+				}
+//				return false;
+//				if (nre.notreleased) {
+//					dba.putA02(en, n, "E", 0, nre.rc, nre.errText);
+//					System.out.println("\tNot released yet: " + x.num);
+//				} else if (nre.internalerror) { 
+//					dba.putA02(en, n, "E", 0, nre.rc, nre.errText);
+//					System.out.println("\tInternal error: " + x.num);
+//				} else {
+//					dba.putA02(en, n, "E", 0, nre.rc, nre.errText);
+//					System.out.println("\tUNKNOWN: " + x.num);
+//				}
 			}
 		}
 		return needmore;
 	}
-	void importNote(NotesDB dba, InputStream is) throws IOException, SQLException {
-		com.sap.lpad.Entry enbig = JAXB.unmarshal(is, com.sap.lpad.Entry.class);
-		dba.putA01(enbig, Instant.now());
-	}
 	
-	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, int num, String lang, int ver, int mark, boolean debug) throws IOException, NoteRetrException {
-    	Path ph = null, pg;
-    	String b;
+	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, com.sap.lpad.Entry en0, int num, String lang, int ver, int mark, Path ph) throws IOException, NoteRetrException {
+    	assert wc!=null : wc;
+    	assert num>0 : num;
+    	assert ph!=null : ph;
+		String b = String.format("https://launchpad.support.sap.com/services/odata/svt/%s/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')",
+    		mark==NotesDB.SAP_KBA ? "snogwskba" : "snogwscorr", num, ver, lang);
 		URL u = null;
-		if (mark==NotesDB.SAP_KBA) {
-			b = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwskba"
-					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
-		} else {//if (mark!=NotesDB.SAP_SECNOTE){
-			b = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
-					+ "/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')", num, ver, lang);
-		} //else throw new RuntimeException(String.format("Security note download is not implemented yet: %010d %s v%d", num, lang, ver));
-		u = new URL(b + "?$expand=Languages");
-		com.sap.lpad.Entry en, enbig;
+		com.sap.lpad.Entry en;
+		int ma=3, rc=0;
 		Page o = null;
 		WebResponse wr = null;
-		int rc=500, ma=2;
-		while (rc>=500 && --ma>0) {
+		if (en0==null) {
+			u = new URL(b + "?$expand=Languages");
+		} else {
+			StringJoiner facets = new StringJoiner(",");
+			for (com.sap.lpad.Link l: en0.getLink()) if (!"self".equals(l.getRel())) 
+				facets.add(l.getTitle());
+			u = new URL(b + "?$expand=" + facets);
+		}
+		while (ma-->0) {
 			o = wc.getPage(u);
 			wr = o.getWebResponse();
 			rc = wr.getStatusCode();
+			if (rc==200||rc==400) break;
 		}
-		assert wr!=null;// && ma>0;
+		assert wr!=null;
 		if (rc>399) {
-			ph = Cache.fs.getPath(String.format("errorEntry_%010d_main.xml", num));
 	    	IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(ph));
 	    	NoteRetrException ne = new NoteRetrException(ph, u, rc);
 	    	throw ne;
-		} else if (debug) {
-			ph = Cache.fs.getPath(String.format("%010d_%s_v%d_entry1.xml", num, lang, ver));
+		} else {
 			IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(ph));
 			en = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Entry.class);
-		} else {
-			en = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
 		}
-		assert (en!=null);
-		StringJoiner facets = new StringJoiner(",");
-		String masterLang = null;
-		for (com.sap.lpad.Link l: en.getLink()) if (!"self".equals(l.getRel())) {
-			facets.add(l.getTitle());
-			if (l.getInline()!=null)
-				if (l.getInline().getFeed()!=null && l.getInline().getFeed().getEntry()!=null && l.getInline().getFeed().getEntry().size()>0)
-				if (l.getTitle().equals("Languages") ) masterLang = l.getInline().getFeed().getEntry().get(0).getContent().getProperties().getLangMaster();
-		}
-//		assert lang.equals(masterLang) : String.format("for note %010d asked lang %s instead of %s", num, lang, masterLang);
-//		assert "DEJ".contains(masterLang);
-		u = new URL(b + "?$expand=" + facets);
-		rc = 500;
-		ma = 2;
-		while (rc>=500 && --ma>0) {
-			o = wc.getPage(u);
-			wr = o.getWebResponse();
-			rc = wr.getStatusCode();
-		}
-		assert wr!=null; // && ma>0;
-		if (rc>399) {
-			pg = Cache.fs.getPath(String.format("errorEntry_%010d_facets.xml", num));
-	    	IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(pg));
-	    	NoteRetrException ne = new NoteRetrException(pg, u, rc);
-	    	throw ne;
-		} else if (debug) {
-			pg = Cache.fs.getPath(String.format("%010d_%s_v%d_entryfacets.xml", num, lang, ver));
-			IOUtils.copy(wr.getContentAsStream(), Files.newOutputStream(pg));
-			enbig = JAXB.unmarshal(Files.newInputStream(pg), com.sap.lpad.Entry.class);
-			Files.delete(ph);
-		} else {
-			enbig = JAXB.unmarshal(wr.getContentAsStream(), com.sap.lpad.Entry.class);
-		}
-		return enbig;
+		return en;
 	}	
 	/**
 	 * checks tmpdir for previously cached notes (zip-archives)

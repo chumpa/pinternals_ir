@@ -198,7 +198,8 @@ public class NotesDB {
 		return ps;
 	}
 	private PreparedStatement setPs(PreparedStatement ps, Object[] args) throws SQLException {
-		assert ps!=null && args!=null && args.length>0;
+		assert ps!=null : ps;
+		assert args!=null && args.length>0 : args;
 		int i = 1;
 		for (Object o: args) {
 			if (o==null)
@@ -495,8 +496,24 @@ public class NotesDB {
 		return azl;
 	}
 
+	PreparedStatement lttins = null;
+	private void putA03(String notesType, String lang, int typeKey, String typeText) throws SQLException {
+		assert dba && !isClosed();
+		if (lttins==null) lttins = sqla("lttins");
+		Object[] ax = new Object[]{notesType, typeKey, lang, typeText};
+		setPs(lttins, ax).executeUpdate();
+	}
+	
+	PreparedStatement qryins = null;
+	void putA02(int notenumber, String language, int version, Instant n, String askLanguage, Integer askVersion, Integer rc, String message) throws SQLException {
+		assert dba && !isClosed();
+		if (qryins==null) qryins = sqla("queryins");
+		Object[] qry = new Object[]{notenumber, language, version, n.toString(), askLanguage, askVersion, rc, message};
+		setPs(qryins, qry).executeUpdate();
+	}
+	
 	private Map<String,PreparedStatement> dbaPs = new HashMap<String,PreparedStatement>();
-	void putA01(com.sap.lpad.Entry en, Instant n) throws SQLException {
+	void putA01(com.sap.lpad.Entry en) throws SQLException {
 		assert dba && !isClosed();
 		String pk[] = new String[]{"trunkins", 
 				"longins", "softcomins", "corrinsins", "spins", "reftoins", "refbyins", "patchins", "attachins",
@@ -507,23 +524,22 @@ public class NotesDB {
 		List<Entry<String,Object[]>> todo = new ArrayList<Entry<String,Object[]>>();
 		Object o[];
 		Object[] facets = new Object[]{
-			Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()), n.toString(), 
-			null, null, null, null, null, null, null, null, null, null, null, null  				
-			};
+			Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()),   
+			null, null, null, null, null, null, null, null, null, null, null, null};
 
 		Map<String,Integer> fn = new HashMap<String,Integer>();
-		fn.put("Languages", 5);
-		fn.put("LongText", 6);
-		fn.put("SoftCom", 7);
-		fn.put("Sp", 8);
-		fn.put("Patch", 9);
-		fn.put("CorrIns", 10);
-		fn.put("RefTo", 11);
-		fn.put("RefBy", 12);
-		fn.put("SideSol", 13);
-		fn.put("SideCau", 14);
-		fn.put("Attach", 15);
-		fn.put("Product", 16);
+		fn.put("Languages", 4);
+		fn.put("LongText", 5);
+		fn.put("SoftCom", 6);
+		fn.put("Sp", 7);
+		fn.put("Patch", 8);
+		fn.put("CorrIns", 9);
+		fn.put("RefTo", 10);
+		fn.put("RefBy", 11);
+		fn.put("SideSol", 12);
+		fn.put("SideCau", 13);
+		fn.put("Attach", 14);
+		fn.put("Product", 15);
 
 //		int a = fac[idxOneBased-1]==null ? 0 : (Integer)fac[idxOneBased-1];
 //		fac[idxOneBased-1] = new Integer(a+1);
@@ -547,6 +563,7 @@ public class NotesDB {
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),q.getLanguage(),Integer.parseInt(q.getVersion()),
 						q.getTypeKey(), q.getText()};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("longins", o));
+					putA03(p.getType(), p.getLanguage(), Integer.parseInt(q.getTypeKey()), q.getTypeText());
 					break;
 				case "SoftCom":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
@@ -604,18 +621,19 @@ public class NotesDB {
 				}
 			}
 		}
-//		n.toString(), 
+//		queryins = insert into Queries(NotesNumber,Language,Version,\
+//				askdate,gotlanguage,gotversion,rc,answer) \
 		o = new Object[]{Integer.parseInt(p.getSapNotesNumber()), p.getSapNotesKey(), p.getTitle(), p.getType()
 				, Integer.parseInt(p.getVersion()), p.getPriority(), p.getCategory(), p.getReleasedOn(), p.getComponentKey()
 				, p.getComponentText(), p.getLanguage()};
 		setPs(dbaPs.get("trunkins"), o).addBatch();
 		setPs(dbaPs.get("facetins"), facets).addBatch();
 		setPs(dbaPs.get("facetupd"), facets).addBatch();
-
 		for (Entry<String,Object[]> e: todo) 
 			setPs(dbaPs.get(e.getKey()), e.getValue()).addBatch();
 		for (String s: pk) dbaPs.get(s).executeBatch();
 	}
+
 	// area-db into notes.db
 	void fromDBAtoCDB(NotesDB dba) throws SQLException {
 		// dba == area db

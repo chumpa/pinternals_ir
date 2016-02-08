@@ -1,6 +1,7 @@
 package com.pinternals.ir;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
@@ -9,6 +10,11 @@ import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.Iterator;
 import java.util.List;
+import java.util.StringJoiner;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import javax.xml.bind.JAXB;
 
 import org.apache.commons.cli.CommandLine;
 import org.apache.commons.cli.CommandLineParser;
@@ -177,8 +183,10 @@ public class NotesRetriever {
 					l.areaList(db);
 					for (NotesDB dba: l.dbas) {
 						String nick = dba.getNick();
+						Path facets = dba.pathdb.resolve("../facets").normalize();
 						if (as==1 || args.contains(nick)) {
-							while (l.getNotes(db, dba, cmd.hasOption('d'))) System.out.println(nick + " passed");
+							while ( l.getNotes(db, dba, facets) )
+								System.out.println(nick + " passed");
 							args.remove(nick);
 						} else {
 							System.err.println(String.format("warn: %s not used", nick));
@@ -188,26 +196,44 @@ public class NotesRetriever {
 					b = false;
 					break;
 				case "LPAD.IMPORT":
-					assert as>1;
 					l = new Launchpad(cache);
 					l.areaList(db);
+					Pattern xp = Pattern.compile("(\\d+)_(.)_(.+)\\.xml");
 					for (NotesDB dba: l.dbas) {
+						StringJoiner sj = new StringJoiner("\n");
 						String nick = dba.getNick();
-						if (args.contains(nick)) {
-							Path facets = dba.pathdb.resolve("../facets").normalize(), p;
-							Iterator<Path> it = Files.newDirectoryStream(facets, "000*_entryfacets.xml").iterator();
-							int i = 0;
+						Path facets = dba.pathdb.resolve("../facets").normalize(), p;
+						int i = 0;
+						if (as==1 || args.contains(nick)) {
+							Iterator<Path> it = Files.newDirectoryStream(facets, "000*.xml").iterator();
 							while (it.hasNext()) {
 								p = it.next();
-								l.importNote(dba, Files.newInputStream(p));
-								if (++i>999) {
-									System.out.println(i + " commited");
-									dba.commit();
-									i=0;
+								Matcher m = xp.matcher(p.getFileName().toString());
+								assert m.matches() && m.groupCount()==3 : m;
+								com.sap.lpad.Entry en = JAXB.unmarshal(Files.newInputStream(p), com.sap.lpad.Entry.class);
+								com.sap.lpad.Properties pr = en.getContent().getProperties();
+								int n2 = Integer.parseInt(m.group(1)), n3 = Integer.parseInt(pr.getSapNotesNumber()), v3 = Integer.parseInt(pr.getVersion());
+								assert n2==n3 : "Note number error: " + n2 + "/" + n3 + "/" + p.getFileName().toString();
+								String l2 = m.group(2), l22 = m.group(3);
+								if (!pr.getLanguage().equals(l2) || !pr.getVersion().equals(l22)) {
+									sj.add(String.format("ren %s %s", p.getFileName().toString(), String.format("%010d_%s_%d.xml", n2, pr.getLanguage(), v3)));
+								} else {
+									dba.putA01(en);
+									dba.putA02(n3, pr.getLanguage(), v3, Files.getLastModifiedTime(p).toInstant(), null, null, null, null);
+									if (++i>999) {
+										System.out.println(i + " commited");
+										dba.commit();
+										i=0;
+									}
 								}
 							}
 							System.out.println(i + " commited");
 							dba.commit();
+							if (sj.length()>0) {
+								BufferedWriter bw = Files.newBufferedWriter(facets.resolve("renamer.bat"), utf8); 
+								bw.write(sj.toString());
+								bw.close();
+							}
 						}
 					}
 					break;
