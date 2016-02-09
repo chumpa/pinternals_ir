@@ -1,18 +1,18 @@
 package com.pinternals.ir;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.InputStreamReader;
+import java.net.UnknownServiceException;
 import java.nio.charset.Charset;
 import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
-import java.util.StringJoiner;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.xml.bind.JAXB;
 
@@ -26,12 +26,14 @@ import org.apache.http.HttpHost;
 import org.apache.http.auth.Credentials;
 
 import com.gargoylesoftware.htmlunit.WebClient;
+import com.sap.JaxbNote;
+import com.sap.Snotes;
 
 
 public class NotesRetriever {
 //	private static Logger log = Logger.getLogger(NotesRetriever.class.toString());
 	public static final Charset utf8 = Charset.forName("UTF-8");
-	public static final String version = "v0.0.2";
+	public static final String version = "v0.0.3";
 
 	public static void main(String[] argv) throws Exception {
 		Options opts = new Options();
@@ -69,21 +71,22 @@ public class NotesRetriever {
 				+ "STOREPASSWD                  make <uname>.pwd file with stored password\n"
 				+ "INITDB                       create empty database\n"
 				+ "\nSupport.sap.com commands are:\n"
-				+ "SUPP.GETNOTES [dtfrom dtto]  {online} request for notes list, store zip\n"
 				+ "SUPP.GETNOTES.CMD            makes query script\n"
 				+ "SUPP.CACHE                   handle into db\n"
+				+ "SUPP.GETNOTES [dtfrom dtto]  {online} request for notes list, store zip\n"
 				+ "\n"
 				+ "Launchpad.support.sap.com commands are:\n" 
 //				+ "LPAD.SYNC                    mutual sync <area>.db with notes.db\n"
-				+ "LPAD.GETNOTES [nick] ...     {online} ask unknown application areas\n"
+				+ "LPAD.CACHE [nick] ...        UNSUPPORTED since v0.0.2: import Zip4SSet\n"
 				+ "LPAD.IMPORT [nick] ...       import from <nick>/facets into nick.db\n"
 //				+ "LPAD.DEEP                    {online} ask for notes content\n"
 //				+ "LPAD.Z1 <dba>                {test} z1-test given dba\n"
 //				+ "LPAD.Z2 <dba>                {online,test} z2-test given dba\n"
 //				+ "LPAD.Z3 <dba>                {test} z3-test given dba\n"
+				+ "LPAD.GETNOTES [nick] ...     {online} ask unknown application areas\n"
 				+ "\n"
 				+ "support.sap.com/swdc commands are:\n" 
-				+ "SWDC.TEST                    test log on to SWDC\n"
+				+ "SWDC.TEST                    {online}test log on to SWDC\n"
 				+ "\n"
 				+ ""
 				);
@@ -153,6 +156,15 @@ public class NotesRetriever {
 					for (NotesDB dba: l.dbas) 
 						l.cacheTmpdir(dba, true);
 					break;
+				case "LPAD.IMPORT":
+					l = new Launchpad(cache);
+					l.areaList(db);
+					for (NotesDB dba: l.dbas) {
+						if (as==1 || args.contains(dba.getNick()) )
+							dba.importFacets(db, dba.pathdb.resolve("../facets").normalize());
+					}
+					break;
+					
 				default:
 					if (uname==null) {
 						System.err.println("Error: user is not given. Use '-u uname'");
@@ -195,58 +207,68 @@ public class NotesRetriever {
 					for (String x: args.subList(1, args.size())) System.out.println(String.format("warn: %s not found", x));
 					b = false;
 					break;
-				case "LPAD.IMPORT":
-					l = new Launchpad(cache);
-					l.areaList(db);
-					Pattern xp = Pattern.compile("(\\d+)_(.)_(.+)\\.xml");
-					for (NotesDB dba: l.dbas) {
-						StringJoiner sj = new StringJoiner("\n");
-						String nick = dba.getNick();
-						Path facets = dba.pathdb.resolve("../facets").normalize(), p;
-						int i = 0;
-						if (as==1 || args.contains(nick)) {
-							Iterator<Path> it = Files.newDirectoryStream(facets, "000*.xml").iterator();
-							while (it.hasNext()) {
-								p = it.next();
-								Matcher m = xp.matcher(p.getFileName().toString());
-								assert m.matches() && m.groupCount()==3 : m;
-								com.sap.lpad.Entry en = JAXB.unmarshal(Files.newInputStream(p), com.sap.lpad.Entry.class);
-								com.sap.lpad.Properties pr = en.getContent().getProperties();
-								int n2 = Integer.parseInt(m.group(1)), n3 = Integer.parseInt(pr.getSapNotesNumber()), v3 = Integer.parseInt(pr.getVersion());
-								assert n2==n3 : "Note number error: " + n2 + "/" + n3 + "/" + p.getFileName().toString();
-								String l2 = m.group(2), l22 = m.group(3);
-								if (!pr.getLanguage().equals(l2) || !pr.getVersion().equals(l22)) {
-									sj.add(String.format("ren %s %s", p.getFileName().toString(), String.format("%010d_%s_%d.xml", n2, pr.getLanguage(), v3)));
-								} else {
-									dba.putA01(en);
-									dba.putA02(n3, pr.getLanguage(), v3, Files.getLastModifiedTime(p).toInstant(), null, null, null, null);
-									if (++i>999) {
-										System.out.println(i + " commited");
-										dba.commit();
-										i=0;
-									}
-								}
-							}
-							System.out.println(i + " commited");
-							dba.commit();
-							if (sj.length()>0) {
-								BufferedWriter bw = Files.newBufferedWriter(facets.resolve("renamer.bat"), utf8); 
-								bw.write(sj.toString());
-								bw.close();
-							}
-						}
-					}
-					break;
 				case "SWDC.TEST":
 					System.out.println("Online support.sap.com/swdc for " + uname);
-					WebClient cl = Launchpad.getLaunchpad(uname, prHost, prCred);
-					swdc = new Swdc(cache, cl); //uname, prHost, prCred);
+					WebClient wc = null;
+					int i = 10;
+					while (i-->0 && wc==null) {
+						try {
+							wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+						} catch (UnknownServiceException se) {
+					    	System.err.println("Unexpected answer: " + se.getMessage());
+						}
+					}
+					if (wc==null) throw new RuntimeException("Cannot log on to LPAD");
+					swdc = new Swdc(cache, wc); //uname, prHost, prCred);
 					swdc.test();
 					b = false;
 					break;
+				case "HREN":
+					l = new Launchpad(cache);
+					l.areaList(db);
+					List<String> areas = new ArrayList<String>();
+					List<Object[]> ns = new ArrayList<Object[]>();
+					for (NotesDB dba: l.dbas) {
+						areas.addAll(Area.nickToArea.get((dba.getNick())) );
+					}
+					Iterator<Path> it = cache.getSupportSapComNotesZip();
+//					Map<String,String> cached = db.w44();  		
+
+					while (it.hasNext()) {
+						Path q = it.next();
+						String x = q.getFileName().toString().replace(".zip", ".xml");
+						ZipInputStream zis = new ZipInputStream(Files.newInputStream(q), utf8);
+						ZipEntry ze = zis.getNextEntry();
+						while(!ze.getName().equals(x)) {
+							ze = zis.getNextEntry();
+						}
+						if (ze.getName().equals(x)) {
+							Snotes sn = JAXB.unmarshal(zis, Snotes.class);
+//							System.out.println(x + "\t" + sn.getNS().size() + "\t" + ze.getLastModifiedTime().toInstant().toString());
+							for (JaxbNote n: sn.getNS()) if (areas.contains(n.getA())) 
+								ns.add(new Object[]{n.getA(), n.getN(), n.getL()});
+						}
+						zis.close();
+					}
+					for (NotesDB dba: l.dbas) {
+						areas.clear();
+						areas.addAll( Area.nickToArea.get(dba.getNick()) );
+						List<AZ> ozs = dba.getNotesDBA();
+						
+						for (Object[] zz: ns) if (areas.contains(zz[0])) {
+							int num = (int)zz[1];
+							String lang = (String)zz[2];
+							for (AZ y: ozs) if (y.num==num) {
+								assert (lang.equals(y.mprop.getLanguage()));
+							}
+//							System.out.println(String.format("%d\t%s\t%s\t%s", n.getN(), n.getA(), n.getL(), n.getD()) );
+						}
+//						if (as==1 || args.contains(dba.getNick()) )
+//							dba.importFacets(db, dba.pathdb.resolve("../facets").normalize());
+					}
+					break;
 				case "":
 					break;
-
 				default:
 					System.err.println(String.format("Unknown command: %s%nTry -h for help", cm));
 					rc = -1;

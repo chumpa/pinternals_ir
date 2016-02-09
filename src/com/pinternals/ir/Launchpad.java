@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.net.UnknownServiceException;
 import java.nio.charset.Charset;
 import java.nio.file.DirectoryStream;
 import java.nio.file.FileSystems;
@@ -537,8 +538,10 @@ public class Launchpad {
 			NotesDB dba = null;
 			if (Files.isRegularFile(dx))
 				dba = new NotesDB(dx, false, true, true);
-			else 
+			else {
+				System.out.println("To create: " + dx);
 				dba = new NotesDB(dx, true, true, true);
+			}
 			BufferedWriter bw = Files.newBufferedWriter(q, utf8);
 			for (Map.Entry<String, Integer> ea: Area.areaToCode.entrySet()) {
 				String area = ea.getKey();
@@ -866,7 +869,7 @@ public class Launchpad {
     	URL u = new URL(s);
     	return u;
 	}
-	public static WebClient getLaunchpad(String uname, HttpHost prHost, Credentials prCred) throws IOException {
+	public static WebClient getLaunchpad(String uname, HttpHost prHost, Credentials prCred) throws IOException, UnknownServiceException {
 		URL ln = new URL("https://launchpad.support.sap.com/services/odata/svt/snogwscorr/");
 		WebClient webClient = null;
 		assert uname != null;
@@ -927,12 +930,10 @@ public class Launchpad {
 		    assert o instanceof XmlPage : o;
 		    passwd = null;
 		    return webClient;
-	    } else if (p instanceof TextPage) {
+	    } else { //if (p instanceof TextPage) {
 	    	TextPage tp = (TextPage)p;
-	    	System.err.println("Unexpected answer: " + tp.getContent());
-	    	throw new RuntimeException();
-	    } else
-	    	throw new RuntimeException("Unpredicted: " + p);
+	    	throw new java.net.UnknownServiceException(tp.getContent()); 
+	    }
 	}
 	
 	public static void main(String args[]) throws Exception {
@@ -976,7 +977,6 @@ public class Launchpad {
 		List<AZ> azs = cdb.getNotesCDB_byAreas(areas);
 		List<AZ> ozs = dba.getNotesDBA();
 
-//		azs.sort(Comparator.comparing(o1->-o1.num));
 		boolean needmore = false, e;
 		Instant n;
 		for (AZ x: azs) { // every x.num occurs at `azs` once
@@ -1009,7 +1009,17 @@ public class Launchpad {
 			if (!e) continue;
 			System.out.println("Need to download note: " + x.num);
 			Path tmp = facets.resolve("tmp" + Instant.now().toEpochMilli());
-			if (wc==null) wc = getLaunchpad(uname, prHost, prCred);
+			if (wc==null) {
+				int i = 10;
+				while (i-->0 && wc==null) {
+					try {
+						wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+					} catch (UnknownServiceException se) {
+				    	System.err.println("Unexpected answer: " + se.getMessage());
+					}
+				}
+				if (wc==null) throw new RuntimeException("Cannot log on to LPAD");
+			}
 			n = Instant.now();
 			int stage = 0;
 			com.sap.lpad.Properties p = null;

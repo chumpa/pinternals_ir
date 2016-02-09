@@ -661,9 +661,9 @@ public class Support {
 	void close() {
 		//TODO close Http connections
 	}
-	static void cache(Cache cache, NotesDB db) throws IOException, SQLException {
+	static void cache(Cache cache, NotesDB cdb) throws IOException, SQLException {
 		Iterator<Path> it = cache.getSupportSapComNotesZip();
-		Map<String,String> cached = db.w44();  		
+		Map<String,String> cached = cdb.w44();  		
 
 		while (it.hasNext()) {
 			Path q = it.next();
@@ -680,7 +680,7 @@ public class Support {
 					System.out.println(x);
 					Snotes sn = JAXB.unmarshal(zis, Snotes.class);
 					assert sn!=null && sn.getNS()!=null && sn.getNS().size()>0;
-					db.walk22(sn, yc==null, x, y);
+					cdb.walk22(sn, yc==null, x, y);
 				}
 //				for (JaxbNote j: sn.n) {
 //					if (j.l.equals("J") && !prj.containsKey(j.c)) {
@@ -695,7 +695,7 @@ public class Support {
 			}
 			zis.close();
 		}
-		db.walk22(null, false, null, null); // clear the caches
+		cdb.walk22(null, false, null, null); // clear the caches
 	}
 	
 	public static void main(String a[]) throws Exception {

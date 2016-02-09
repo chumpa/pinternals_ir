@@ -1,7 +1,11 @@
 package com.pinternals.ir;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
+import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -11,15 +15,25 @@ import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.Map.Entry;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 import java.util.Objects;
 import java.util.ResourceBundle;
 import java.util.Set;
 
+import javax.xml.bind.JAXB;
+
+import org.apache.commons.io.input.CloseShieldInputStream;
 import org.apache.commons.lang3.StringEscapeUtils;
 
 import com.sap.JaxbNote;
@@ -163,6 +177,7 @@ class Area {
 }
 
 public class NotesDB {
+	private static final Charset utf8 = Charset.forName("UTF-8");
 	private static ResourceBundle ddlrb = ResourceBundle.getBundle("com/pinternals/ir/ddl");
 	private static ResourceBundle sqlrb = ResourceBundle.getBundle("com/pinternals/ir/sql");
 	private static ResourceBundle sqlab = ResourceBundle.getBundle("com/pinternals/ir/sqla");
@@ -256,28 +271,30 @@ public class NotesDB {
 		}
 		con = java.sql.DriverManager.getConnection("jdbc:sqlite:" + pat.toFile());
 		con.setAutoCommit(false);
+		List<String> tm = new ArrayList<String>();
+		PreparedStatement ps = null;
 		if (init) {
-			if (!dba) {
-				for (String s: ddlrb.keySet()) if (s.startsWith("0")) {
-					System.out.println(s);
-					PreparedStatement ps = con.prepareStatement(ddl(s));
-					ps.execute();
-				}
-			} else
-				for (String s: ddlrb.keySet()) if (s.startsWith("a")) 
-					con.prepareStatement(ddl(s)).execute();
+			for (String s: ddlrb.keySet()) 
+				if ((s.startsWith("0") && !dba) || (s.startsWith("a") && dba)) tm.add(s);
+			tm.sort(Comparator.naturalOrder());
+			for (String s: tm) {
+				ps = con.prepareStatement(ddl(s));
+				ps.execute();
+				con.commit();
+			}
+			tm.clear();
 		}
-		con.commit();
 		ResourceBundle rb = dba ? sqlab : sqlrb;
 		if (checksql) {
-			for (String s: rb.keySet()) {
-				System.out.println(s);
-				PreparedStatement ps = null;
+			tm.addAll(rb.keySet());
+			tm.sort(Comparator.naturalOrder());
+			for (String s: tm) {
 				String sq = rb.getString(s);
 				try {
 					ps = con.prepareStatement(sq, ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY, ResultSet.CLOSE_CURSORS_AT_COMMIT);
 				} catch (SQLException e) {
 					System.err.println(String.format("database %s cannot compile '%s'%n%s%n%s", pat, s, sq, e.getMessage()));
+					throw e;
 				} finally {
 					if (ps!=null) ps.close();
 				}
@@ -540,9 +557,6 @@ public class NotesDB {
 		fn.put("SideCau", 13);
 		fn.put("Attach", 14);
 		fn.put("Product", 15);
-
-//		int a = fac[idxOneBased-1]==null ? 0 : (Integer)fac[idxOneBased-1];
-//		fac[idxOneBased-1] = new Integer(a+1);
 
 		for (com.sap.lpad.Link l: en.getLink()) {
 			if ("self".equals(l.getRel())) continue;
@@ -842,5 +856,95 @@ public class NotesDB {
 		eu = psSetObjID.executeUpdate();
 		assert eu==1;
 		commit();
+	}
+	
+	/**
+	 * 
+	 * @param cdb notes.db
+	 * @param facets
+	 * @throws IOException
+	 * @throws SQLException
+	 */
+	void importFacets(NotesDB cdb, Path facets) throws IOException, SQLException {
+		assert dba && !isClosed();
+		StringJoiner sj = new StringJoiner("\n");
+		Iterator<Path> it = Files.newDirectoryStream(facets, "*.zip").iterator();
+		Pattern xp = Pattern.compile("(\\d+)_(.)_(.+)\\.xml");
+		while (it.hasNext()) {
+			Path p = it.next();
+			int i=0;
+			ZipInputStream zis = new ZipInputStream(Files.newInputStream(p), utf8);
+			ZipEntry ze = zis.getNextEntry();
+			while (ze!=null) {
+				Matcher m = xp.matcher(ze.getName());
+				assert m.matches() && m.groupCount()==3 : m;
+				com.sap.lpad.Entry en = JAXB.unmarshal(new CloseShieldInputStream(zis), com.sap.lpad.Entry.class);
+				com.sap.lpad.Properties pr = en.getContent().getProperties();
+				putA01(en);
+				putA02(Integer.parseInt(pr.getSapNotesNumber()), pr.getLanguage(),
+						Integer.parseInt(pr.getVersion()), 
+						ze.getLastModifiedTime().toInstant(), null, null, null, null);
+				i++;
+				zis.closeEntry();
+				ze = zis.getNextEntry();
+			}
+			zis.close();
+			commit();
+			System.out.println(String.format("%s - %d commited", p.getFileName(), i));
+		}
+			
+		it = Files.newDirectoryStream(facets, "000*.xml").iterator();
+		int i = 0;
+		while (it.hasNext()) {
+			Path p = it.next();
+			Matcher m = xp.matcher(p.getFileName().toString());
+			assert m.matches() && m.groupCount()==3 : m;
+			com.sap.lpad.Entry en = JAXB.unmarshal(Files.newInputStream(p), com.sap.lpad.Entry.class);
+			com.sap.lpad.Properties pr = en.getContent().getProperties();
+			int n2 = Integer.parseInt(m.group(1)), n3 = Integer.parseInt(pr.getSapNotesNumber()), v3 = Integer.parseInt(pr.getVersion());
+			assert n2==n3 : "Note number error: " + n2 + "/" + n3 + "/" + p.getFileName().toString();
+			String l2 = m.group(2), l22 = m.group(3);
+			if (!pr.getLanguage().equals(l2) || !pr.getVersion().equals(l22)) {
+				sj.add(String.format("ren %s %s", p.getFileName().toString(), String.format("%010d_%s_%d.xml", n2, pr.getLanguage(), v3)));
+			} else {
+				putA01(en);
+				putA02(n3, pr.getLanguage(), v3, Files.getLastModifiedTime(p).toInstant(), null, null, null, null);
+				if (++i>499) {
+					System.out.println(i + " files commited");
+					commit();
+					i=0;
+				}
+			}
+		}
+		if (i>0) {
+			System.out.println(i + " files commited");
+			commit();
+		}
+		if (sj.length()>0) {
+			BufferedWriter bw = Files.newBufferedWriter(facets.resolve("renamer.bat"), utf8); 
+			bw.write(sj.toString());
+			bw.close();
+		}
+		// fill values from DBA into CDB
+		Collection<String> areas = Area.nickToArea.get(getNick());
+		List<AZ> azs = cdb.getNotesCDB_byAreas(areas);
+		List<AZ> ozs = getNotesDBA();
+		for (AZ x: azs) { // every x.num occurs at `azs` once
+			assert x.num>0 && x.mark>=0 && x.objid!=null && x.area!=null && x.mprop==null;
+			for (AZ y: ozs) if (x.num==y.num) {
+				if (x.mark!=y.mark) { 
+					assert x.mark==0 : x.num;
+					System.out.println(String.format("Note %s has to be turned to mark=%d", x.num, y.mark));
+					cdb.setMark(x.num, y.mark);
+					x.mark = y.mark;
+				}
+				if (!x.objid.equals(y.objid)) {
+					assert x.objid.startsWith("Z") : x.num;
+					System.out.println(String.format("Note %s has to be turned to objid=%s", x.num, y.objid));
+					cdb.setObjid(x.num, y.objid);
+					x.objid = y.objid;
+				}
+			}
+		}
 	}
 }
