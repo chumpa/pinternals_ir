@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified">
+  <xs:element name="DevelopmentComponents">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="DevelopmentComponentsElement"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="DevelopmentComponentsElement">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="ChangeNumber"/>
+        <xs:element ref="AppliedDate"/>
+        <xs:element ref="Version"/>
+        <xs:element ref="CsnComponent"/>
+        <xs:element ref="Vendor"/>
+        <xs:element ref="SoftwareType"/>
+        <xs:element ref="SoftwareComponent"/>
+        <xs:element ref="Name"/>
+        <xs:element ref="Location"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="ChangeNumber" type="xs:string"/>
+	<xs:element name="AppliedDate" type="xs:string"/>
+	<xs:element name="CsnComponent" type="xs:string"/>
+	<xs:element name="SoftwareType" type="xs:string"/>
+  <xs:element name="SoftwareComponent" type="xs:string"/>
+  <xs:element name="SAP_ITSAMJ2eeClusterSoftwareComponentPartComponent">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" ref="SAP_ITSAMJ2eeClusterSoftwareComponentPartComponentElement"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+  <xs:element name="SAP_ITSAMJ2eeClusterSoftwareComponentPartComponentElement">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element ref="Version"/>
+        <xs:element ref="Vendor"/>
+        <xs:element ref="Name"/>
+        <xs:element ref="Location"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+	<xs:element name="Version" type="xs:string"/>
+	<xs:element name="Vendor" type="xs:string"/>
+  <xs:element name="Name" type="xs:string"/>
+  <xs:element name="Location" type="xs:string"/>
+</xs:schema>
