@@ -25,14 +25,16 @@ import java.util.Set;
 import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import javax.xml.bind.DataBindingException;
 import javax.xml.bind.JAXB;
+import javax.xml.bind.UnmarshalException;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
@@ -89,21 +91,25 @@ class NoteRetrException extends RuntimeException {
 	<?xml..?><error xmlns="http://schemas.microsoft.com/ado/2007/08/dataservices/metadata">....</error>	  
 		*/
 		// for OData-style errors
-		com.sap.err.Error error = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
-		// for internal errors
-		com.sap.lpad.Error err2 = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Error.class);
-		assert error!=null&&err2!=null;
-		
-		if (err2.getCode()!=null) {
-			this.errCode = err2.getCode();
-			internalerror = interrorCode1.equals(errCode);
-			this.errText = err2.getMessage().trim();
-		} else if (error.getCode()!=null) {
-			this.errText = error.getMessage().getContent().trim();
-			notreleased = rc==400 & nry.equals(errText);
-			internalerror = interrorCode2.equals(this.errText);
-		} else {
-			assert false;
+		try {
+			com.sap.err.Error error = JAXB.unmarshal(Files.newInputStream(ph), com.sap.err.Error.class);
+			// for internal errors
+			com.sap.lpad.Error err2 = JAXB.unmarshal(Files.newInputStream(ph), com.sap.lpad.Error.class);
+			assert error!=null&&err2!=null;
+			
+			if (err2.getCode()!=null) {
+				this.errCode = err2.getCode();
+				internalerror = interrorCode1.equals(errCode);
+				this.errText = err2.getMessage().trim();
+			} else if (error.getCode()!=null) {
+				this.errText = error.getMessage().getContent().trim();
+				notreleased = rc==400 & nry.equals(errText);
+				internalerror = interrorCode2.equals(this.errText);
+			} else {
+				this.errText = Files.lines(ph).collect(Collectors.joining(""));  
+			}
+		} catch (DataBindingException e) {
+			this.errText = Files.lines(ph).collect(Collectors.joining(""));  
 		}
 		this.url = u;
 		this.rc = rc;

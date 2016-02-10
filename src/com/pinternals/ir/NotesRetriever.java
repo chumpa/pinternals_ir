@@ -88,6 +88,7 @@ public class NotesRetriever {
 				+ "support.sap.com/swdc commands are:\n" 
 				+ "SWDC.TEST                    {online}test log on to SWDC\n"
 				+ "\n"
+				+ "NWA file1 ... fileN          test configuration\n"
 				+ ""
 				);
 			return;
@@ -266,6 +267,12 @@ public class NotesRetriever {
 //						if (as==1 || args.contains(dba.getNick()) )
 //							dba.importFacets(db, dba.pathdb.resolve("../facets").normalize());
 					}
+					break;
+				case "NWA":
+					l = new Launchpad(cache);
+					l.areaList(db);
+					NWA n = new NWA(args.subList(1, args.size()));
+					for (NotesDB dba: l.dbas) n.check(dba);
 					break;
 				case "":
 					break;

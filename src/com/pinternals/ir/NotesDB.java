@@ -958,4 +958,23 @@ public class NotesDB {
 			}
 		}
 	}
+
+	PreparedStatement psSWC = null;
+	Object getNotesBySWCV(String name, V f) throws SQLException {
+		assert dba && !isClosed();
+		if (psSWC==null) psSWC=sqla("swcget");
+		psSWC.setString(1, f.formatName1(name));
+		psSWC.setString(2, String.format("SP%03d", f.sp));
+		psSWC.setString(3, String.format("%04d", f.patch));
+		ResultSet rs = psSWC.executeQuery();
+		while (rs.next()) {
+			String num = rs.getString(1);
+			String ver = rs.getString(2);
+			String sp = rs.getString(3);
+			String level = rs.getString(4);
+			String name1 = rs.getString(5);
+			System.out.println(String.format("%s-%s %s %s %s  version=%s", num, ver, sp, level, name1, f.src));
+		}
+		return null;
+	}
 }
