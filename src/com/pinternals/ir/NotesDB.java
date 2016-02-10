@@ -534,15 +534,18 @@ public class NotesDB {
 		assert dba && !isClosed();
 		String pk[] = new String[]{"trunkins", 
 				"longins", "softcomins", "corrinsins", "spins", "reftoins", "refbyins", "patchins", "attachins",
-				"sidecauins", "sidesolins", "productins", "langins", "facetins", "facetupd"};
+				"sidecauins", "sidesolins", "productins", "langins", "othcomins", "facetins", "facetupd"};
 		if (dbaPs.size()==0) for (String s: pk) dbaPs.put(s, sqla(s));
 		com.sap.lpad.Properties q, p = en.getContent().getProperties();
 
 		List<Entry<String,Object[]>> todo = new ArrayList<Entry<String,Object[]>>();
 		Object o[];
 		Object[] facets = new Object[]{
-			Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion()),   
-			null, null, null, null, null, null, null, null, null, null, null, null};
+			Integer.parseInt(p.getSapNotesNumber()), p.getLanguage(), Integer.parseInt(p.getVersion())   
+			, null //Languages -- #4
+			, null, null, null, null, null, null, null, null, null, null, null
+			, null // OtherCom -- #16
+			};
 
 		Map<String,Integer> fn = new HashMap<String,Integer>();
 		fn.put("Languages", 4);
@@ -557,12 +560,17 @@ public class NotesDB {
 		fn.put("SideCau", 13);
 		fn.put("Attach", 14);
 		fn.put("Product", 15);
+		fn.put("OtherCom", 16);
+		fn.put("VersionInfo", 17); //for future
 
 		for (com.sap.lpad.Link l: en.getLink()) {
-			if ("self".equals(l.getRel())) continue;
+			if ("self".equals(l.getRel()) || "VersionInfo".equals(l.getTitle()) ) continue;
+			assert l.getInline()!=null && l.getInline().getFeed()!=null : l.getTitle();
+
 			List<com.sap.lpad.Entry> ex = l.getInline().getFeed().getEntry();
 			assert ex!=null;
 //			System.out.println(l.getTitle());
+			assert fn.containsKey(l.getTitle()) : "key " + l.getTitle() + " is unknown";
 			int fx = fn.get(l.getTitle())-1; 
 			facets[fx] = facets[fx]==null ? new Integer(0) : facets[fx]; 
 			for (com.sap.lpad.Entry eo: ex) {
@@ -630,13 +638,16 @@ public class NotesDB {
 							q.getProductKey(), q.getProductName(), q.getProductVersion() };
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("productins", o));
 					break;
+				case "OtherCom":
+					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
+							q.getKey(), q.getValue() };
+					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("othcomins", o));
+					break;
 				default:
 					throw new RuntimeException("NIY " + l.getTitle() + " " + ex.size());
 				}
 			}
 		}
-//		queryins = insert into Queries(NotesNumber,Language,Version,\
-//				askdate,gotlanguage,gotversion,rc,answer) \
 		o = new Object[]{Integer.parseInt(p.getSapNotesNumber()), p.getSapNotesKey(), p.getTitle(), p.getType()
 				, Integer.parseInt(p.getVersion()), p.getPriority(), p.getCategory(), p.getReleasedOn(), p.getComponentKey()
 				, p.getComponentText(), p.getLanguage()};

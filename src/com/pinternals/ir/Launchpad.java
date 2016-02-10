@@ -4,7 +4,6 @@ import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.UnknownServiceException;
 import java.nio.charset.Charset;
@@ -24,6 +23,7 @@ import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
 import java.util.StringJoiner;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -32,6 +32,7 @@ import javax.xml.bind.JAXB;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
+import org.apache.commons.lang3.StringEscapeUtils;
 import org.apache.http.HttpHost;
 import org.apache.http.auth.AuthScope;
 import org.apache.http.auth.Credentials;
@@ -736,7 +737,6 @@ public class Launchpad {
 //		}
 //	}
 	
-//	@Deprecated
 //	void deepAreaTest(NotesDB db, NotesDB dba) throws SQLException, IOException, ParseException {
 //		List<AZ> azl = dba.getNotesDBA();	// only number and area are filled
 //		for (AZ az: azl) {
@@ -863,14 +863,17 @@ public class Launchpad {
 //    	URL u = new URL(s.substring(0, s.length()-1));
 //    	return u;
 //	}
-	static URL getBySchemeZip(String lang, int num, int ver, String value) throws MalformedURLException {
-		String s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
-				+ "/Zip4SSet(SapNotesNumber='%010d',Version='%04d',Language='%s')%s", num, ver, lang, value);
-    	URL u = new URL(s);
-    	return u;
-	}
+
+//	static URL getBySchemeZip(String lang, int num, int ver, String value) throws MalformedURLException {
+//		String s = String.format("https://launchpad.support.sap.com/services/odata/svt/snogwscorr"
+//				+ "/Zip4SSet(SapNotesNumber='%010d',Version='%04d',Language='%s')%s", num, ver, lang, value);
+//    	URL u = new URL(s);
+//    	return u;
+//	}
+	
+	//
 	public static WebClient getLaunchpad(String uname, HttpHost prHost, Credentials prCred) throws IOException, UnknownServiceException {
-		URL ln = new URL("https://launchpad.support.sap.com/services/odata/svt/snogwscorr/");
+		URL ln = new URL("https://launchpad.support.sap.com/services/odata/svt/snogwscorr");
 		WebClient webClient = null;
 		assert uname != null;
 		
@@ -935,8 +938,22 @@ public class Launchpad {
 	    	throw new java.net.UnknownServiceException(tp.getContent()); 
 	    }
 	}
+	public static java.util.Properties simpleJsonParse(String x) {
+		if (x.charAt(0)=='{' && x.charAt(x.length()-1)=='}') x = x.substring(1, x.length()-1).trim();
+		Pattern re = Pattern.compile("\"[^\"]*\"", Pattern.MULTILINE);
+		Matcher m = re.matcher(x);
+		java.util.Properties prop1 = new java.util.Properties();
+		while (m.find()) {
+			String name = x.substring(m.start()+1, m.end()-1).trim();
+			m.find();
+			prop1.put(name, x.substring(m.start()+1, m.end()-1).trim());
+		}
+		return prop1;
+	}
 	
 	public static void main(String args[]) throws Exception {
+		String x = new String(Files.readAllBytes(FileSystems.getDefault().getPath("dispatcher.json")), utf8).trim();
+		System.out.println(simpleJsonParse(x));
 		DirectoryStream<Path> ds = Files.newDirectoryStream(FileSystems.getDefault().getPath("."), "*_entryfacets.xml");
 		Iterator<Path> it = ds.iterator();
 		String s, ml;
@@ -1066,25 +1083,52 @@ public class Launchpad {
 		return needmore;
 	}
 	
-	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, com.sap.lpad.Entry en0, int num, String lang, int ver, int mark, Path ph) throws IOException, NoteRetrException {
+	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, com.sap.lpad.Entry en0, int num, String lang, int ver, int mark, Path ph) 
+			throws IOException, NoteRetrException {
     	assert wc!=null : wc;
     	assert num>0 : num;
     	assert ph!=null : ph;
-		String b = String.format("https://launchpad.support.sap.com/services/odata/svt/%s/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')",
-    		mark==NotesDB.SAP_KBA ? "snogwskba" : "snogwscorr", num, ver, lang);
 		URL u = null;
-		com.sap.lpad.Entry en;
 		int ma=3, rc=0;
 		Page o = null;
 		WebResponse wr = null;
+
+		if (mark==0) {
+    		u = new URL(String.format("https://launchpad.support.sap.com/applications/nnf/services/bsp/sap/support/lp/dispatcher.json?number=%010d", num));
+    		while (ma-->0) {
+    			o = wc.getPage(u);
+    			wr = o.getWebResponse();
+    			rc = wr.getStatusCode();
+    			if (rc==200||rc==400) break;
+    		}
+    		assert wr!=null;
+    		java.util.Properties js = simpleJsonParse(wr.getContentAsString());
+    		String alias = js.getProperty("alias");
+    		assert alias!=null;
+    		switch (alias) {
+    		case "CORR" : mark = NotesDB.SAP_NOTE; break;
+    		case "SECURITY": mark = NotesDB.SAP_SECNOTE; break;
+    		case "KBA" : mark = NotesDB.SAP_KBA; break;
+    		default: assert false: alias;
+    		}
+    	}
+    	//TODO 0002247644
+    	assert mark>0 && mark<4 : mark;
+		String b = String.format("https://launchpad.support.sap.com/services/odata/svt/%s/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')",
+    		mark==NotesDB.SAP_KBA ? "snogwskba" : mark==NotesDB.SAP_SECNOTE ? "snogwssecurity" : "snogwscorr", num, ver, lang);
+		com.sap.lpad.Entry en;
 		if (en0==null) {
 			u = new URL(b + "?$expand=Languages");
 		} else {
 			StringJoiner facets = new StringJoiner(",");
-			for (com.sap.lpad.Link l: en0.getLink()) if (!"self".equals(l.getRel())) 
-				facets.add(l.getTitle());
+			// TODO for security notes VersionInfo causes error
+			// https://launchpad.support.sap.com/services/odata/svt/snogwssecurity/TrunkSet(SapNotesNumber='0001232259',Version='5',Language='E')?$expand=RefBy,RefTo,CorrIns,Patch,Sp,OtherCom,SoftCom,Attach,LongText,VersionInfo,Languages,SideCau,SideSol 
+			for (com.sap.lpad.Link l: en0.getLink()) if (!"self".equals(l.getRel()) ) 
+				if (!"VersionInfo".equals(l.getTitle())) 
+					facets.add(l.getTitle());
 			u = new URL(b + "?$expand=" + facets);
 		}
+		ma = 3;
 		while (ma-->0) {
 			o = wc.getPage(u);
 			wr = o.getWebResponse();

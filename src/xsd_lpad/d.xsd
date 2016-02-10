@@ -51,5 +51,8 @@
 	<xs:element name="ProductKey" type="xs:string"/>
 	<xs:element name="ProductName" type="xs:string"/>
 	<xs:element name="ProductVersion" type="xs:string"/>
+	<!-- OtherCom -->
+	<xs:element name="Key" type="xs:string"/>
+	<xs:element name="Value" type="xs:string"/>
 	
 </xs:schema>

@@ -32,7 +32,7 @@ import com.sap.Snotes;
 
 public class NotesRetriever {
 //	private static Logger log = Logger.getLogger(NotesRetriever.class.toString());
-	public static final Charset utf8 = Charset.forName("UTF-8");
+	static final Charset utf8 = Charset.forName("UTF-8");
 	public static final String version = "v0.0.3";
 
 	public static void main(String[] argv) throws Exception {

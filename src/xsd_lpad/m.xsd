@@ -52,6 +52,8 @@
     		<xs:element ref="d:ProductName"/>
     		<xs:element ref="d:ProductVersion"/>
     		
+    		<xs:element ref="d:Key"/>
+    		<xs:element ref="d:Value"/>
     	</xs:all>
       <!--xs:sequence>
         <xs:element ref="d:SapNotesNumber"/>
