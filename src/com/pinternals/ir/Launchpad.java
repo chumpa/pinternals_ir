@@ -1100,7 +1100,7 @@ public class Launchpad {
 		WebResponse wr = null;
 
 		if (mark==0) {
-    		u = new URL(String.format("https://launchpad.support.sap.com/applications/nnf/services/bsp/sap/support/lp/dispatcher.json?number=%010d", num));
+    		u = new URL(String.format("https://launchpad.support.sap.com/applications/nnf/services/bsp/sap/support/lp/dispatcher.json?number=%d", num));
     		while (ma-->0) {
     			o = wc.getPage(u);
     			wr = o.getWebResponse();
@@ -1110,7 +1110,7 @@ public class Launchpad {
     		assert wr!=null;
     		java.util.Properties js = simpleJsonParse(wr.getContentAsString());
     		String alias = js.getProperty("alias");
-    		assert alias!=null;
+    		assert alias!=null : num + "\n" + wr.getContentAsString() + "\n" + u;
     		switch (alias) {
     		case "CORR" : mark = NotesDB.SAP_NOTE; break;
     		case "SECURITY": mark = NotesDB.SAP_SECNOTE; break;

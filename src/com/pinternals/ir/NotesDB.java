@@ -600,7 +600,7 @@ public class NotesDB {
 					break;
 				case "Patch":
 					o = new Object[]{Integer.parseInt(q.getSapNotesNumber()),Integer.parseInt(q.getVersion()),
-							q.getName(), q.getSp(), q.getVersion()};
+							q.getName(), q.getSp(), Integer.parseInt(q.getLevel())};
 					todo.add(new AbstractMap.SimpleEntry<String,Object[]>("patchins", o));
 					break;
 				case "CorrIns":
@@ -963,18 +963,58 @@ public class NotesDB {
 	Object getNotesBySWCV(String name, V f) throws SQLException {
 		assert dba && !isClosed();
 		if (psSWC==null) psSWC=sqla("swcget");
-		psSWC.setString(1, f.formatName1(name));
+		psSWC.setString(1, name);
 		psSWC.setString(2, String.format("SP%03d", f.sp));
-		psSWC.setString(3, String.format("%04d", f.patch));
+		psSWC.setInt(3, f.patch);
 		ResultSet rs = psSWC.executeQuery();
 		while (rs.next()) {
 			String num = rs.getString(1);
 			String ver = rs.getString(2);
-			String sp = rs.getString(3);
-			String level = rs.getString(4);
-			String name1 = rs.getString(5);
-			System.out.println(String.format("%s-%s %s %s %s  version=%s", num, ver, sp, level, name1, f.src));
+			String title = rs.getString(3);
+			System.out.println(String.format("%s\t%s\t%s", name, num, title));
 		}
 		return null;
+	}
+	
+	PreparedStatement sldswcv1 = null; 
+	void putSWCV(List<java.util.Properties> prop) throws SQLException {
+		assert !dba && !isClosed();
+		if (sldswcv1==null) sldswcv1=sql("sldswcv1");
+		sldswcv1.clearBatch();
+		for (java.util.Properties p: prop) {
+			String type = p.getProperty("Type");
+			if (type==null) {
+				System.err.println(p);
+				continue;
+			}
+			sldswcv1.setString(1, p.getProperty("Name"));
+			sldswcv1.setString(2, p.getProperty("Caption"));
+			sldswcv1.setString(3, p.getProperty("Version"));
+			sldswcv1.setString(4, type);
+			sldswcv1.addBatch();
+		}
+		sldswcv1.executeBatch();
+		commit();
+	}
+	
+	PreparedStatement sldswcv2 = null; 
+	void getSWCV(Collection<String> set, Object[][] arr, int j) throws SQLException {
+		assert !dba && !isClosed();
+		assert set!=null && arr!=null && j>0;
+		if (sldswcv2==null) sldswcv2=sql("sldswcv2");
+		ResultSet rs = sldswcv2.executeQuery();
+		while (rs.next()) {
+			String name = rs.getString(1);
+			if (!set.contains(name)) continue;
+			String caption = rs.getString(2);
+			String version = rs.getString(3);
+			for (int i=0; i<j; i++) if (name.equals( (String)arr[1][i] )) {
+				V f = (V)arr[0][i];
+				if (f.eq(version)) {
+					arr[2][i] = caption;
+					break;
+				}
+			}
+		}
 	}
 }

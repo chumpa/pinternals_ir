@@ -6,7 +6,7 @@
         <xs:element ref="DECLARATION"/>
       </xs:sequence>
       <xs:attribute name="CIMVERSION" use="required" type="xs:string"/>
-      <xs:attribute name="DTDVERSION" use="required" type="xs:string"/>
+    	<xs:attribute name="DTDVERSION" use="required" type="xs:string"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="DECLARATION">
@@ -16,38 +16,37 @@
       </xs:sequence>
     </xs:complexType>
   </xs:element>
+	
   <xs:element name="DECLGROUP.WITHPATH">
     <xs:complexType>
       <xs:sequence>
-        <xs:element maxOccurs="unbounded" ref="VALUE.OBJECTWITHPATH"/>
+      	<xs:element maxOccurs="unbounded" name="VALUE.OBJECTWITHPATH" type="VALUE.OBJECTWITHPATH"/>
       </xs:sequence>
     </xs:complexType>
   </xs:element>
-  <xs:element name="VALUE.OBJECTWITHPATH">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="INSTANCEPATH"/>
-        <xs:element ref="INSTANCE"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="INSTANCEPATH">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="NAMESPACEPATH"/>
-        <xs:element ref="INSTANCENAME"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="NAMESPACEPATH">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="HOST"/>
-        <xs:element ref="LOCALNAMESPACEPATH"/>
-      </xs:sequence>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="HOST" type="xs:string"/>
+	
+	<xs:complexType name="VALUE.OBJECTWITHPATH">
+		<xs:sequence>
+			<xs:element name="INSTANCEPATH" type="INSTANCEPATH" minOccurs="1" maxOccurs="1"/>
+			<xs:element name="INSTANCE" type="INSTANCE" minOccurs="1" maxOccurs="1"/>
+		</xs:sequence>
+	</xs:complexType>
+	
+  <xs:complexType name="INSTANCEPATH">
+    <xs:sequence>
+    	<xs:element name="NAMESPACEPATH" type="NAMESPACEPATH"/>
+      <xs:element ref="INSTANCENAME"/>
+    </xs:sequence>
+  </xs:complexType>
+	
+  <xs:complexType name="NAMESPACEPATH">
+    <xs:sequence>
+      <xs:element ref="HOST"/>
+      <xs:element ref="LOCALNAMESPACEPATH"/>
+    </xs:sequence>
+  </xs:complexType>
+
+	<xs:element name="HOST" type="xs:string"/>
   <xs:element name="LOCALNAMESPACEPATH">
     <xs:complexType>
       <xs:sequence>
@@ -57,7 +56,7 @@
   </xs:element>
   <xs:element name="NAMESPACE">
     <xs:complexType>
-      <xs:attribute name="NAME" use="required" type="xs:string"/>
+    	<xs:attribute name="NAME" use="required" type="xs:string"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="INSTANCENAME">
@@ -65,7 +64,7 @@
       <xs:sequence>
         <xs:element maxOccurs="unbounded" ref="KEYBINDING"/>
       </xs:sequence>
-      <xs:attribute name="CLASSNAME" use="required" type="xs:string"/>
+    	<xs:attribute name="CLASSNAME" use="required" type="xs:string"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="KEYBINDING">
@@ -73,38 +72,41 @@
       <xs:sequence>
         <xs:element ref="KEYVALUE"/>
       </xs:sequence>
-      <xs:attribute name="NAME" use="required" type="xs:string"/>
+    	<xs:attribute name="NAME" use="required" type="xs:string"/>
     </xs:complexType>
   </xs:element>
   <xs:element name="KEYVALUE" type="xs:string"/>
-  <xs:element name="INSTANCE">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element maxOccurs="unbounded" ref="QUALIFIER"/>
-        <xs:element maxOccurs="unbounded" ref="PROPERTY"/>
-      </xs:sequence>
-      <xs:attribute name="CLASSNAME" use="required" type="xs:string"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="QUALIFIER">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element ref="VALUE"/>
-      </xs:sequence>
-      <xs:attribute name="NAME" use="required" type="xs:string"/>
-      <xs:attribute name="TOINSTANCE" use="required" type="xs:boolean"/>
-      <xs:attribute name="TOSUBCLASS" type="xs:boolean"/>
-      <xs:attribute name="TYPE" use="required" type="xs:string"/>
-    </xs:complexType>
-  </xs:element>
-  <xs:element name="PROPERTY">
-    <xs:complexType>
-      <xs:sequence>
-        <xs:element minOccurs="0" ref="VALUE"/>
-      </xs:sequence>
-      <xs:attribute name="NAME" use="required" type="xs:string"/>
-      <xs:attribute name="TYPE" use="required" type="xs:string"/>
-    </xs:complexType>
-  </xs:element>
+	
+  <xs:complexType name="INSTANCE">
+    <xs:sequence>
+    	<xs:choice maxOccurs="unbounded">
+    		<xs:element type="QUALIFIER" name="QUALIFIER"/>
+    		<xs:element type="PROPERTY" name="PROPERTY"/>
+    		<xs:element type="PROPERTY.ARRAY" name="PROPERTY.ARRAY"/>
+    	</xs:choice>
+    </xs:sequence>
+    <xs:attribute name="CLASSNAME" use="required" type="xs:string"/>
+  </xs:complexType>
+  
+	<xs:complexType name="QUALIFIER">
+    <xs:sequence>
+      <xs:element ref="VALUE"/>
+    </xs:sequence>
+    <xs:attribute name="NAME" use="required" type="xs:string"/>
+    <xs:attribute name="TOINSTANCE" use="required" type="xs:boolean"/>
+    <xs:attribute name="TOSUBCLASS" type="xs:boolean"/>
+    <xs:attribute name="TYPE" use="required" type="xs:string"/>
+  </xs:complexType>
+  <xs:complexType name="PROPERTY">
+    <xs:sequence>
+      <xs:element minOccurs="0" ref="VALUE"/>
+    </xs:sequence>
+    <xs:attribute name="NAME" use="required" type="xs:string"/>
+    <xs:attribute name="TYPE" use="required" type="xs:string"/>
+  </xs:complexType>
+	<xs:complexType name="PROPERTY.ARRAY">
+    <xs:attribute name="NAME" use="required" type="xs:string"/>
+    <xs:attribute name="TYPE" use="required" type="xs:string"/>
+  </xs:complexType>
   <xs:element name="VALUE" type="xs:string"/>
 </xs:schema>

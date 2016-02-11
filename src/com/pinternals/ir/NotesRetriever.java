@@ -272,7 +272,13 @@ public class NotesRetriever {
 					l = new Launchpad(cache);
 					l.areaList(db);
 					NWA n = new NWA(args.subList(1, args.size()));
-					for (NotesDB dba: l.dbas) n.check(dba);
+					for (NotesDB dba: l.dbas) n.check(db, dba);
+					break;
+				case "SLD":
+					for (String s: args.subList(1, as)) {
+						List<java.util.Properties> prop = NWA.parseSLD(FileSystems.getDefault().getPath(s));
+						db.putSWCV(prop);
+					}
 					break;
 				case "":
 					break;
