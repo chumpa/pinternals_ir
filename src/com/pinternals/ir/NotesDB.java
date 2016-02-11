@@ -1017,4 +1017,42 @@ public class NotesDB {
 			}
 		}
 	}
+
+	PreparedStatement sapk1=null, sapk2=null; 
+	void getNotesBySAPK(Sapk pk) throws SQLException {
+		assert dba && !isClosed();
+		assert pk!=null;
+
+		if (sapk1==null) sapk1=sqla("sapk1");
+		if (sapk2==null) sapk2=sqla("sapk2");
+		sapk1.setString(1, pk.name);
+		sapk1.setString(2, pk.ver);
+		sapk2.setString(1, pk.name);
+
+		ResultSet rs = sapk1.executeQuery(), rs2;
+		while (rs.next()) {
+			int num = rs.getInt(1);
+			int ver = rs.getInt(2);
+			sapk2.setInt(2, num);
+			sapk2.setInt(3, ver);
+			rs2 = sapk2.executeQuery();
+			System.out.println(String.format("%s-%s-%d\t%d-%d", pk.name, pk.ver, pk.patchlevel, num, ver));
+			while (rs2.next()) {
+				String sp = rs2.getString(1);
+				int level = rs2.getInt(2);
+				boolean b = false;
+				if (pk.devk.length()=="SAPKB74099".length() && sp.length()=="SAPKB74099".length()) {
+					String sver = sp.substring(5, 8);
+					if (sver.equals(pk.ver)) {
+						System.out.println(String.format(" %s==%s sp=%s level=%d", sver, pk.ver, sp, level));
+						b = true;
+					}
+				} else {
+					throw new RuntimeException(pk.devk + "\t" + sp);
+				}
+				
+				if (!b) System.out.println(String.format("\t\tsp=%s level=%d", sp, level));
+			}
+		}
+	}
 }

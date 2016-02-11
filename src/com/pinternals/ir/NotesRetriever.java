@@ -271,7 +271,11 @@ public class NotesRetriever {
 				case "NWA":
 					l = new Launchpad(cache);
 					l.areaList(db);
-					NWA n = new NWA(args.subList(1, args.size()));
+					NWA n = new NWA(args.get(1));
+					for (String s: args.subList(2, as) ) {
+						Path p = FileSystems.getDefault().getPath(s);
+						n.addSysInfo(p);
+					}
 					for (NotesDB dba: l.dbas) n.check(db, dba);
 					break;
 				case "SLD":

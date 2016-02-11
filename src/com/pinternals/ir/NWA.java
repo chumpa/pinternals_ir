@@ -1,14 +1,13 @@
 package com.pinternals.ir;
 
 import java.io.IOException;
-import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -63,23 +62,95 @@ class V {
 	}
 }
 
+class Sapk {
+	String name, ver, devk;
+	int patchlevel;
+	Sapk(String s) {
+		String r[] = s.split("\t");
+		assert r.length>=4 : r.length+s;
+		name=r[0];
+		ver=r[1];
+		patchlevel=Integer.parseInt(r[2]);
+		devk=r[3];
+	}
+}
 public class NWA {
-	com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent comp1 = null;
-	com.sap.nwa.DevelopmentComponents comp2 = null;
-	public NWA (List<String> files) {
-		for (String s: files) {
-			Path p = FileSystems.getDefault().getPath(s);
-			com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent x = 
-					JAXB.unmarshal(p.toFile(), com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent.class);
-			com.sap.nwa.DevelopmentComponents y = JAXB.unmarshal(p.toFile(), com.sap.nwa.DevelopmentComponents.class);
-			if (x!=null && x.getSAPITSAMJ2EeClusterSoftwareComponentPartComponentElement()!=null && x.getSAPITSAMJ2EeClusterSoftwareComponentPartComponentElement().size()>0) 
-				comp1=x;
-			else if (y!=null && y.getDevelopmentComponentsElement()!=null && y.getDevelopmentComponentsElement().size()>0) 
-				comp2 = y;
+	String sid = null;
+	private boolean abap=false, java=false, mdm=false;
+	
+	private com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent comp1 = null;
+	private com.sap.nwa.DevelopmentComponents comp2 = null;
+	private List<Sapk> sapk = new ArrayList<Sapk>();
+
+	public NWA (String z) {
+		assert z!=null;
+		String p[] = z.split(":");
+		sid = p[0];
+		assert sid!=null && sid.length()==3 && sid.toUpperCase().equals(sid) : sid;
+		for (int i=1; i<p.length; i++) {
+			abap = abap || "ABAP".equals(p[i]);
+			java = java || "JAVA".equals(p[i]);
+			mdm = mdm || "MDM".equals(p[i]);
+		}
+		assert abap || java || mdm;
+		assert (mdm && !(abap && java)) || (!mdm && (abap||java)) : String.format("abap=%s java=%s mdm=%s", abap, java, mdm);
+	}
+	public NWA (String sid, boolean abap, boolean java, boolean mdm) {
+		assert sid!=null && sid.length()==3 && sid.toUpperCase().equals(sid) : sid;
+		assert abap || java || mdm;
+		assert (mdm && !(abap && java)) || (!mdm && (abap||java)) : String.format("abap=%s java=%s mdm=%s", abap, java, mdm);
+		this.sid = sid;
+		this.abap = abap;
+		this.java = java;
+		this.mdm = mdm;
+	}
+
+	public void addSysInfo(Path p) throws IOException {
+		assert !mdm;
+		String kind = "unk";
+		if (abap&&!java) 
+			kind = "ABAP";
+		else if (!abap&&java)
+			kind = "JAVA";
+		else
+			throw new RuntimeException("to implement soon: dual-stack");
+
+		switch(kind){
+		case "JAVA":
+			com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent x;
+			com.sap.nwa.DevelopmentComponents y;
+			x =	JAXB.unmarshal(p.toFile(), com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent.class);
+			y = JAXB.unmarshal(p.toFile(), com.sap.nwa.DevelopmentComponents.class);
+			if (x!=null && x.getSAPITSAMJ2EeClusterSoftwareComponentPartComponentElement()!=null 
+					&& x.getSAPITSAMJ2EeClusterSoftwareComponentPartComponentElement().size()>0) comp1=x;
+			else if (y!=null && y.getDevelopmentComponentsElement()!=null 
+					&& y.getDevelopmentComponentsElement().size()>0) comp2 = y;
+			break;
+		case "ABAP":
+			Iterator<String> it = Files.lines(p).iterator();
+			while (it.hasNext()) sapk.add(new Sapk(it.next()));
+			break;
 		}
 	}
-	
+	/**
+	 * 
+	 * @param cdb
+	 * @param dba
+	 * @throws SQLException
+	 */
 	void check(NotesDB cdb, NotesDB dba) throws SQLException {
+		if (java && comp1!=null) 
+			checkSCA(comp1, cdb, dba);
+		else if (abap && sapk.size()>0)
+			checkABAP(sapk, cdb, dba);
+	}
+	
+	private static void checkABAP(List<Sapk> ar, NotesDB cdb, NotesDB dba) throws SQLException {
+		assert ar!=null && ar.size()>0;
+		for (Sapk a: ar) dba.getNotesBySAPK(a);
+	}
+	
+	private static void checkSCA(com.sap.nwa.SAPITSAMJ2EeClusterSoftwareComponentPartComponent comp1, NotesDB cdb, NotesDB dba) throws SQLException {
 		assert comp1!=null;
 		Set<String> zz = new HashSet<String>();
 		int i=0, j = comp1.getSAPITSAMJ2EeClusterSoftwareComponentPartComponentElement().size();
@@ -96,14 +167,11 @@ public class NWA {
 			}
 		}
 		j = i;
-		// select SWCV from 
 		cdb.getSWCV(zz, arr, j);
 		
 		for (i=0; i<j; i++) {
 			V f = (V)arr[0][i];
-			String name = (String)arr[1][i];
 			String caption = (String)arr[2][i];
-//			System.out.println(String.format("%s\t%s\t%s", name, f, caption));
 			Object o = dba.getNotesBySWCV(caption, f);
 		}
 	}
