@@ -254,7 +254,7 @@ public class NotesRetriever {
 					for (NotesDB dba: l.dbas) {
 						areas.clear();
 						areas.addAll( Area.nickToArea.get(dba.getNick()) );
-						List<AZ> ozs = dba.getNotesDBA();
+						List<AZ> ozs = dba.getNotesDBA(db.cat, db.prio);
 						
 						for (Object[] zz: ns) if (areas.contains(zz[0])) {
 							int num = (int)zz[1];
@@ -283,6 +283,11 @@ public class NotesRetriever {
 						List<java.util.Properties> prop = NWA.parseSLD(FileSystems.getDefault().getPath(s));
 						db.putSWCV(prop);
 					}
+					break;
+				case "Report":
+					l = new Launchpad(cache);
+					l.areaList(db);
+					db.stat1(l.dbas);
 					break;
 				case "":
 					break;

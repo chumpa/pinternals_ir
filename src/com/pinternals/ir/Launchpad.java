@@ -31,7 +31,6 @@ import java.util.zip.ZipInputStream;
 
 import javax.xml.bind.DataBindingException;
 import javax.xml.bind.JAXB;
-import javax.xml.bind.UnmarshalException;
 
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.io.input.CloseShieldInputStream;
@@ -79,7 +78,7 @@ class NoteRetrException extends RuntimeException {
 	int rc = 0;
 
 	NoteRetrException(Path ph, URL u, int rc) throws IOException {
-//		System.er r.println(String.format("HTTP error %d when ask %s", rc, u));
+//		System.err.println(String.format("HTTP error %d when ask %s", rc, u));
 		/* there are 4 error rezults, look at `ph':
 		 1. Text asnwer: "An existing connection was forcibly closed by the remote host" or "An existing connection was forcibly closed by backend .."
 		 2. html-answer:
@@ -325,7 +324,7 @@ class NoteA {
 }
 
 class AZ{
-	int num, mark; //, longTexts=0, swcv=0, sp=0;
+	int num, mark, cat, prio; //, longTexts=0, swcv=0, sp=0;
 	String area, objid=null;//, askdate=null, langMaster=null;
 	com.sap.lpad.Properties mprop=null;
 	
@@ -345,14 +344,17 @@ class AZ{
 	 * @param area
 	 * @param obj
 	 */
-	AZ(int num, String area, String obj, int mark) {
+	AZ(int num, String area, String obj, int mark, int cat, int prio) {
 		assert num>0;
 		assert mark>=0;
 		assert area!=null && obj!=null;
+		assert cat>0 && prio>0 : cat + " " + prio;
 		this.num = num;
 		this.objid = obj;
 		this.area = area;
 		this.mark = mark;
+		this.cat = cat;
+		this.prio = prio;
 	}
 }
 
@@ -586,7 +588,7 @@ public class Launchpad {
 		System.out.println(dba.getNick());
 		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
 		List<AZ> azs = cdb.getNotesCDB_byAreas(areas);
-		List<AZ> ozs = dba.getNotesDBA();
+		List<AZ> ozs = dba.getNotesDBA(cdb.cat, cdb.prio);
 
 		boolean needmore = false, e;
 		Instant n;
@@ -603,15 +605,15 @@ public class Launchpad {
 				assert y.objid!=null : y.objid;
 				assert y.area!=null : y.area;
 				assert y.mprop!=null : y.mprop;
-				if (x.mark!=y.mark) { 
+				if (x.mark!=y.mark) { 	//TODO move to stat1
 					assert x.mark==0 : x.num;
-					System.out.println(String.format("Note %s has to be turned to mark=%d", x.num, y.mark));
+//					System.out.println(String.format("Note %s has to be turned to mark=%d", x.num, y.mark));
 					cdb.setMark(x.num, y.mark);
 					x.mark = y.mark;
 				}
-				if (!x.objid.equals(y.objid)) {
+				if (!x.objid.equals(y.objid)) {	//TODO move to stat1
 					assert x.objid.startsWith("Z") : x.num;
-					System.out.println(String.format("Note %s has to be turned to objid=%s", x.num, y.objid));
+//					System.out.println(String.format("Note %s has to be turned to objid=%s", x.num, y.objid));
 					cdb.setObjid(x.num, y.objid);
 					x.objid = y.objid;
 				}

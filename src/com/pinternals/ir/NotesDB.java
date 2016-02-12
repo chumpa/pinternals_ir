@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -21,15 +20,15 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.StringJoiner;
 import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.ResourceBundle;
+import java.util.Set;
+import java.util.StringJoiner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
-import java.util.Objects;
-import java.util.ResourceBundle;
-import java.util.Set;
 
 import javax.xml.bind.JAXB;
 
@@ -301,7 +300,11 @@ public class NotesDB {
 			}
 		}
 		for (String s: rb.keySet()) if (s.startsWith("00open")) con.prepareStatement(rb.getString(s)).execute();
-		if (!dba) pairToMap3(sql("01types"), types);
+		if (!dba) {
+			pairToMap3(sql("01types"), types);
+			pairToMap3(sql("01prioget2"), prio);
+			pairToMap3(sql("01catget2"), cat);
+		}
 		con.commit();
 	}
 
@@ -465,7 +468,7 @@ public class NotesDB {
 		while (rs.next()) {
 			String area = Area.codeToArea.get(rs.getInt(3));
 			assert area!=null && as.contains(area);
-			AZ z = new AZ(rs.getInt(1), area, rs.getString(2), rs.getInt(4));
+			AZ z = new AZ(rs.getInt(1), area, rs.getString(2), rs.getInt(4), rs.getInt(5), rs.getInt(6));
 			az.add(z);
 		}
 		cl.executeUpdate();
@@ -480,8 +483,9 @@ public class NotesDB {
 	 * @return
 	 * @throws SQLException
 	 */
-	List<AZ> getNotesDBA() throws SQLException {
+	List<AZ> getNotesDBA(Map<String,Integer> cat, Map<String,Integer> prio) throws SQLException {
 		assert dba && !isClosed();
+		assert cat.size()>0 && prio.size()>0 : cat + " " + prio;
 		List<AZ> azl = new ArrayList<AZ>(10000);
 		if (ps3b==null) ps3b = sqla("trunkget");// con.prepareStatement(""
 		assert types!=null && types.size()>0 : "note types aren't filled /" + types;
@@ -504,7 +508,8 @@ public class NotesDB {
 //			String langMaster = rs.getString(12), askdate = rs.getString(13);
 			Integer tp = types.get(p.getType());
 			Objects.requireNonNull(tp, String.format("'%s' not mapped to mark", p.getType()));
-			AZ az = new AZ(num, p.getComponentKey(), p.getSapNotesKey(), tp);
+			int cat1 = cat.get(rs.getString(7)), prio1 = prio.get(rs.getString(6));
+			AZ az = new AZ(num, p.getComponentKey(), p.getSapNotesKey(), tp, cat1, prio1);
 			az.mprop = p;
 //			az.langMaster = langMaster;
 //			az.askdate = askdate;
@@ -939,7 +944,7 @@ public class NotesDB {
 		// fill values from DBA into CDB
 		Collection<String> areas = Area.nickToArea.get(getNick());
 		List<AZ> azs = cdb.getNotesCDB_byAreas(areas);
-		List<AZ> ozs = getNotesDBA();
+		List<AZ> ozs = getNotesDBA(cdb.cat, cdb.prio);
 		for (AZ x: azs) { // every x.num occurs at `azs` once
 			assert x.num>0 && x.mark>=0 && x.objid!=null && x.area!=null && x.mprop==null;
 			for (AZ y: ozs) if (x.num==y.num) {
@@ -1054,5 +1059,34 @@ public class NotesDB {
 				if (!b) System.out.println(String.format("\t\tsp=%s level=%d", sp, level));
 			}
 		}
+	}
+	
+	PreparedStatement stat1clr=null, stat1ins=null, stat1upd=null, stat1get=null; 
+	void stat1(List<NotesDB> dbas) throws SQLException {
+		assert !dba && !isClosed();
+		if (stat1clr==null) stat1clr=sql("stat1clr");
+		if (stat1ins==null) stat1ins=sql("stat1ins");
+		if (stat1upd==null) stat1upd=sql("stat1upd");
+		stat1clr.executeUpdate();
+		stat1ins.executeUpdate();
+		commit();
+		for (NotesDB dba: dbas) {
+			System.out.println(dba.getNick());
+			assert dba.dba && !dba.isClosed() : dba;
+			stat1get = dba.sqla("stat1get");
+			ResultSet rs = stat1get.executeQuery();
+			while (rs.next()) {
+				int num = rs.getInt(1);
+				String lang = rs.getString(2);
+				if (lang.equals("E")) {
+					stat1upd.setInt(1, num);
+					stat1upd.setInt(2, 1);
+					stat1upd.addBatch();
+				}
+			}
+			stat1upd.executeBatch();
+			commit();
+		}
+		
 	}
 }

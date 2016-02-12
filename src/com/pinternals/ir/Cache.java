@@ -19,7 +19,7 @@ import javafx.util.Pair;
 import org.apache.commons.lang3.StringEscapeUtils;
 
 public class Cache {
-	public static final Charset utf8 = NotesRetriever.utf8;
+	private static final Charset utf8 = NotesRetriever.utf8;
 	public static final FileSystem fs = FileSystems.getDefault();
 	Map<Integer,Path> cacheRawVer = new HashMap<Integer,Path>();
 	Path root, supportSapComNotes, notesdb, launchpad;
@@ -45,26 +45,6 @@ public class Cache {
 	Path getLaunchpadArealist() throws IOException {
 		return launchpad.resolve("arealist.txt");
 	}
-
-//	List<Pair<Character,Path>> getRawFiles(boolean onlyupdated) throws IOException {
-//		List<Pair<Character,Path>> z = filterRawFiles(rawdir);
-//		if (!onlyupdated) return z;
-//		for (Iterator<Pair<Character,Path>> it = z.iterator(); it.hasNext();) {
-//			Pair<Character,Path> p = it.next();
-//			Path raw = p.getValue();
-//			Path xml = getPathXml(raw);
-//			if (!Files.isRegularFile(xml)) continue;
-//			FileTime rawtime = Files.getLastModifiedTime(raw);
-//			FileTime xmltime = Files.getLastModifiedTime(xml);
-//			if (xmltime.compareTo(rawtime)>=0) it.remove(); 
-//		}
-//		return z;
-//	}
-//	Path getPathXml(Path raw) {
-//		String n = raw.getFileName().toString();
-//		n = n.substring(0, n.lastIndexOf(".zip")) + ".xml";
-//		return Paths.get(xmldir.toString(), n);
-//	}
 	Path getTmpDir() throws IOException {
 		Path p = Files.createTempDirectory(root, "tmp_sup_");
 		return p;
@@ -104,8 +84,4 @@ public class Cache {
 		p.print("\n</snotes>");
 		p.close();
 	}
-
-//	private static boolean isLang(String lang) {
-//		return lang!=null && "DEJ".contains(lang);
-//	}
 }
