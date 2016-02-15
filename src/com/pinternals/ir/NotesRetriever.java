@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -139,6 +140,7 @@ public class NotesRetriever {
 			Launchpad l = null;
 			Support sup = null;
 			Swdc swdc = null;
+			List<Integer> vedro = null;
 			boolean b = false;
 			try {
 				switch (cm) {
@@ -287,8 +289,37 @@ public class NotesRetriever {
 				case "Report":
 					l = new Launchpad(cache);
 					l.areaList(db);
-					db.stat1(l.dbas);
+					db.stat1(l.dbas, true);
 					break;
+				case "Report2":
+					l = new Launchpad(cache);
+					l.areaList(db);
+					List<Integer> x = db.stat1(l.dbas, false);
+					for (int j: x) {
+						System.out.println(j);
+					}
+					break;
+				case "Z1":
+					l = new Launchpad(cache, uname, prHost, prCred);
+					l.areaList(db);
+					vedro = db.stat1(l.dbas, false);
+					System.out.println(vedro.size());
+					List<AZ> azs = db.getNotesCDB_byNums(vedro, false);
+					Iterator<AZ> ita = azs.iterator();
+					while (ita.hasNext()) {
+						AZ az = ita.next();
+						if (az.area.startsWith("SBO")) ita.remove();
+					}
+					System.out.println(azs.size());
+					while ( l.dlNotes(azs, vedro, null) ) {}
+					break;
+//				case "Z2":
+//					l = new Launchpad(cache, uname, prHost, prCred);
+//					l.areaList(db);
+//					vedro = db.stat1(l.dbas, false);
+//					Comparator<Integer> cmp = Comparator.comparing(o1 -> o1);
+//					while ( l.dlNotes(db, vedro, 100, cmp) ) {}
+//					break;
 				case "":
 					break;
 				default:

@@ -15,6 +15,7 @@ import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -77,6 +78,14 @@ class NoteRetrException extends RuntimeException {
 	URL url = null;
 	int rc = 0;
 
+	NoteRetrException(String error, URL u, int rc) throws IOException {
+		// for other errors
+		internalerror = true;
+		this.errText = error.trim();
+		this.url = u;
+		this.rc = rc;
+	}
+	
 	NoteRetrException(Path ph, URL u, int rc) throws IOException {
 //		System.err.println(String.format("HTTP error %d when ask %s", rc, u));
 		/* there are 4 error rezults, look at `ph':
@@ -363,12 +372,15 @@ public class Launchpad {
 	private Cache cache = null;
 	List<NotesDB> dbas = null;
 	WebClient wc = null;
+	Path inbox = null;
 	private String uname; 
 	private HttpHost prHost;
 	private Credentials prCred;
 
-	Launchpad (Cache cache) {
+	Launchpad (Cache cache) throws IOException {
 		this.cache = cache;
+		this.inbox = cache.launchpad.resolve("_inbox");
+		if (!Files.isDirectory(this.inbox)) Files.createDirectory(this.inbox); 
 	}
 	
 	/**
@@ -385,6 +397,9 @@ public class Launchpad {
 		this.uname = uname;
 		this.prHost = prHost;
 		this.prCred = prCred;
+		this.inbox = cache.launchpad.resolve("_inbox");
+		if (!Files.isDirectory(this.inbox)) Files.createDirectory(this.inbox); 
+
 	}
 
 	Launchpad (Cache cache, WebClient wc) {
@@ -586,7 +601,8 @@ public class Launchpad {
 		assert !cdb.dba && dba.dba;
 		assert !cdb.isClosed() && !dba.isClosed();
 		System.out.println(dba.getNick());
-		Collection<String> areas = Area.nickToArea.get((dba.getNick()));
+		String nick = dba.getNick();
+		Collection<String> areas = Area.nickToArea.get(nick);
 		List<AZ> azs = cdb.getNotesCDB_byAreas(areas);
 		List<AZ> ozs = dba.getNotesDBA(cdb.cat, cdb.prio);
 
@@ -620,7 +636,7 @@ public class Launchpad {
 				e = false;
 			}
 			if (!e) continue;
-			System.out.println("Need to download note: " + x.num);
+			System.out.println("Need to download note: " + x.num + " " + nick);
 			Path tmp = facets.resolve("tmp" + Instant.now().toEpochMilli());
 			if (wc==null) {
 				int i = 10;
@@ -657,11 +673,11 @@ public class Launchpad {
 					// av2, al2 - заполнены
 					dba.putA02(x.num, al2, av2, n, al, av, nre.rc, nre.errText);
 					dba.commit();
-					Files.delete(tmp);
+					Files.deleteIfExists(tmp);
 				} else {
 					dba.putA02(x.num, al, av, n, null, null, nre.rc, nre.errText);
 					dba.commit();
-					Files.delete(tmp);
+					Files.deleteIfExists(tmp);
 				}
 //				return false;
 //				if (nre.notreleased) {
@@ -678,7 +694,61 @@ public class Launchpad {
 		}
 		return needmore;
 	}
-	
+
+	boolean dlNotes(List<AZ> azs, List<Integer> toDl, Comparator<Integer> cmp) throws IOException, SQLException {
+		assert cache!=null;
+		assert inbox!=null && Files.isDirectory(inbox);
+		Path facets = inbox;
+
+		Iterator<Path> ds = Files.newDirectoryStream(inbox).iterator();
+		Pattern pt = Pattern.compile("(\\d{10})_[DEJ]_\\d+[.]xml");
+		while (ds.hasNext()) {
+			String s = ds.next().getFileName().toString();
+			Matcher m = pt.matcher(s);
+			if (m.matches()) {
+				int i = Integer.parseInt(m.group(1));
+				toDl.remove(new Integer(i));
+				System.out.println("removed: " + s);
+			}
+		}
+		if (cmp!=null) toDl.sort(cmp);
+		for (AZ x: azs) { // every x.num occurs at `azs` once
+			if (!toDl.contains(x.num)) continue;
+			assert x.num>0 && x.mark>=0 && x.objid!=null && x.area!=null && x.mprop==null;
+			if (wc==null) {
+				int i = 10;
+				while (i-->0 && wc==null) {
+					try {
+						wc = Launchpad.getLaunchpad(uname, prHost, prCred);
+					} catch (UnknownServiceException se) {
+				    	System.err.println("Unexpected answer: " + se.getMessage());
+					}
+				}
+				if (wc==null) throw new RuntimeException("Cannot log on to LPAD");
+			}
+			com.sap.lpad.Properties p = null;
+			com.sap.lpad.Entry en = null;
+			int av = 0, av2 = 0;
+			String al = "E", al2 = null;
+			Path tmp = facets.resolve("tmp" + Instant.now().toEpochMilli());
+			try {
+				en = downloadEntry2(wc, null, x.num, al, av, x.mark, tmp);
+				p = en.getContent().getProperties();
+				av2 = Integer.parseInt( p.getVersion() );
+				al2 = p.getLanguage();
+				en = downloadEntry2(wc, en, x.num, al2, av2, x.mark, tmp);
+				p = en.getContent().getProperties();
+				Path xd = facets.resolve(String.format("%010d_%s_%d.xml", x.num, al2, av2));
+				Files.move(tmp, xd);
+				System.out.println(x.num + "\t" + x.area +"\tOK");
+			} catch (NoteRetrException nre) {
+				System.out.println(x.num + "\t" + x.area +"\t" + nre.errText + "\t" + tmp.getFileName().toString());
+				Files.deleteIfExists(tmp);
+			}
+		}
+		return toDl.size()>0;
+	}
+
 	private static com.sap.lpad.Entry downloadEntry2(WebClient wc, com.sap.lpad.Entry en0, int num, String lang, int ver, int mark, Path ph) 
 			throws IOException, NoteRetrException {
     	assert wc!=null : wc;
@@ -700,16 +770,25 @@ public class Launchpad {
     		assert wr!=null;
     		java.util.Properties js = simpleJsonParse(wr.getContentAsString());
     		String alias = js.getProperty("alias");
+    		if (alias==null) {
+    			NoteRetrException ne = new NoteRetrException(wr.getContentAsString(), u, rc);
+    	    	throw ne;
+    		}
     		assert alias!=null : num + "\n" + wr.getContentAsString() + "\n" + u;
     		switch (alias) {
     		case "CORR" : mark = NotesDB.SAP_NOTE; break;
     		case "SECURITY": mark = NotesDB.SAP_SECNOTE; break;
     		case "KBA" : mark = NotesDB.SAP_KBA; break;
-    		default: assert false: alias;
+    		case "OTHER" : mark = NotesDB.SAP_ONE; break;
+    		default: assert false: alias + "\t" + u;
     		}
     	}
+		if (mark==NotesDB.SAP_ONE) {
+			NoteRetrException ne = new NoteRetrException("SAPBusinessOne", u, 200);
+	    	throw ne;
+		}
     	//TODO 0002247644
-    	assert mark>0 && mark<4 : mark;
+    	assert mark>=NotesDB.SAP_KBA && mark<NotesDB.SAP_ONE : mark;
 		String b = String.format("https://launchpad.support.sap.com/services/odata/svt/%s/TrunkSet(SapNotesNumber='%010d',Version='%d',Language='%s')",
     		mark==NotesDB.SAP_KBA ? "snogwskba" : mark==NotesDB.SAP_SECNOTE ? "snogwssecurity" : "snogwscorr", num, ver, lang);
 		com.sap.lpad.Entry en;

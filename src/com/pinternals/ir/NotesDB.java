@@ -184,7 +184,7 @@ public class NotesDB {
 //	(1, 'SAP Knowledge Base Article'), \
 //	(2, 'SAP Note'),\
 //	(3, 'SAP Security Note');\
-	public static final int SAP_UNKNOWNYET=0, SAP_KBA=1, SAP_NOTE=2, SAP_SECNOTE=3;
+	public static final int SAP_UNKNOWNYET=0, SAP_KBA=1, SAP_NOTE=2, SAP_SECNOTE=3, SAP_ONE=4;
 	static Map<String,Integer> types = new HashMap<String,Integer>();
 
 	private Connection con = null;
@@ -476,7 +476,50 @@ public class NotesDB {
 		return az;
 		
 	}
-	
+
+	/**
+	 * Ask central database for all notes by areas
+	 * @param collection of areas (ex: BC-XI, BC-JAS-SEC-CON, ...)
+	 * @return 
+	 * @throws SQLException
+	 */
+	List<AZ> getNotesCDB_byNums(List<Integer> as, boolean storeOrder) throws SQLException {
+		PreparedStatement cl = sql("w08a"), ps = sql("w08b");
+		cl.executeUpdate();
+		for (int a: as) {
+			ps.setInt(1, a);
+			ps.addBatch();
+		}
+		ps.executeBatch();
+//		commit();
+		ps = sql("w08n");
+		ResultSet rs = ps.executeQuery();
+		List<AZ> az = new ArrayList<AZ>(10000);
+		while (rs.next()) {
+			String area = Area.codeToArea.get(rs.getInt(3));
+			assert area!=null;
+			AZ z = new AZ(rs.getInt(1), area, rs.getString(2), rs.getInt(4), rs.getInt(5), rs.getInt(6));
+			az.add(z);
+		}
+		cl.executeUpdate();
+		commit();
+		System.out.println("**" + az.size());
+		if (storeOrder) {
+			int i=az.size();
+			List<AZ> az2 = new ArrayList<AZ>(az.size());
+			while (i-->0) az2.add(null);
+			for (AZ a: az) {
+				int q = as.indexOf(a.num);
+				assert q>=0 && q<az.size() : q;
+				assert az2.get(q)==null : az2.get(q);
+				az2.set(q, a);
+			}
+			az = az2;
+		} 
+		System.out.println("**" + az.size());
+		return az;
+	}
+
 	PreparedStatement ps3b = null;
 	/**
 	 * 
@@ -1061,32 +1104,73 @@ public class NotesDB {
 		}
 	}
 	
-	PreparedStatement stat1clr=null, stat1ins=null, stat1upd=null, stat1get=null; 
-	void stat1(List<NotesDB> dbas) throws SQLException {
+	PreparedStatement stat1clr=null, stat1ins=null, stat1upd=null, stat1get=null, stat1gethottest=null; 
+	List<Integer> stat1(List<NotesDB> dbas, boolean update) throws SQLException {
 		assert !dba && !isClosed();
 		if (stat1clr==null) stat1clr=sql("stat1clr");
 		if (stat1ins==null) stat1ins=sql("stat1ins");
 		if (stat1upd==null) stat1upd=sql("stat1upd");
-		stat1clr.executeUpdate();
-		stat1ins.executeUpdate();
-		commit();
-		for (NotesDB dba: dbas) {
-			System.out.println(dba.getNick());
-			assert dba.dba && !dba.isClosed() : dba;
-			stat1get = dba.sqla("stat1get");
-			ResultSet rs = stat1get.executeQuery();
-			while (rs.next()) {
-				int num = rs.getInt(1);
-				String lang = rs.getString(2);
-				if (lang.equals("E")) {
+		if (stat1gethottest==null) stat1gethottest=sql("stat1gethottest");
+		List<Integer> numsToDload = new ArrayList<Integer>();
+		if (update) {
+			stat1clr.executeUpdate();
+			stat1ins.executeUpdate();
+			commit();
+			for (NotesDB dba: dbas) {
+				System.out.println(dba.getNick());
+				assert dba.dba && !dba.isClosed() : dba;
+				stat1get = dba.sqla("stat1get");
+				ResultSet rs = stat1get.executeQuery();
+				while (rs.next()) {
+					int num = rs.getInt(1);
+					String lang = rs.getString(2);
 					stat1upd.setInt(1, num);
-					stat1upd.setInt(2, 1);
+					if (lang.equals("E")) 
+						stat1upd.setInt(2, 1);
+					else
+						stat1upd.setNull(2, java.sql.Types.INTEGER);
+					if (lang.equals("D")) 
+						stat1upd.setInt(3, 1);
+					else
+						stat1upd.setNull(3, java.sql.Types.INTEGER);
+					if (lang.equals("J")) 
+						stat1upd.setInt(4, 1);
+					else
+						stat1upd.setNull(4, java.sql.Types.INTEGER);
 					stat1upd.addBatch();
 				}
+				stat1upd.executeBatch();
+				commit();
 			}
-			stat1upd.executeBatch();
-			commit();
 		}
-		
+		// make a lattice
+		int maxAreas = 15000; // get it from Areas
+		int zz[][] = new int[dbas.size()][maxAreas], j = 0;
+		for (NotesDB dba: dbas) {
+			String nick = dba.getNick();
+			Set<String> areas = Area.nickToArea.get(nick);
+			for (int i=0; i<maxAreas;i++) zz[j][i] = 0;
+			for (String s: areas) {
+				zz[j][Area.getCode(s)] += 1; 
+			}
+			j++;
+		}
+
+		ResultSet rs = stat1gethottest.executeQuery();
+		while (rs.next()) {
+			int number = rs.getInt(1);
+			int prio = rs.getInt(2);
+			if (prio<10) break;
+			int area = rs.getInt(3);
+			int qty = rs.getInt(4);
+			int q = 0;
+			for (int i=0; i<dbas.size(); i++) 
+				q += zz[i][area]; 
+			if (q==0) {
+				//System.out.println(String.format("%010d   %s\t%d\t%d", number, Area.codeToArea.get(area), prio, qty));
+				if (qty==0) numsToDload.add(number);
+			}
+		}
+		return numsToDload;
 	}
 }
