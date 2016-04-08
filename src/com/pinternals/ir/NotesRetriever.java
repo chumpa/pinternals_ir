@@ -1,6 +1,7 @@
 package com.pinternals.ir;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.net.UnknownServiceException;
 import java.nio.charset.Charset;
@@ -12,6 +13,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -127,21 +129,43 @@ public class NotesRetriever {
 				}
 			}
 			Cache cache = new Cache(cmd.getOptionValue('c'));
-			if (cm.equals("SUPP.GETNOTES.CMD")) {
-				new Support(null).zZz(cache, null, null, true);
-				return;
-			}
-			// Offline commands: database and cache are required
 			HttpHost prHost = null;
 			Credentials prCred = null;
 			NotesDB db = null;
-			db = new NotesDB(cache.notesdb, false, true, false);
-			int rc = 0;
+			int rc = 0, i, j;
 			Launchpad l = null;
 			Support sup = null;
 			Swdc swdc = null;
-			List<Integer> vedro = null;
+			List<Integer> vedro = new ArrayList<Integer>();
 			boolean b = false;
+			BufferedWriter bw;
+			List<AZ> azs = null;
+
+			if (cm.equals("SUPP.GETNOTES.CMD")) {
+				new Support(null).zZz(cache, null, null, true);
+				return;
+			} else if (cm.equals("LPAD.DL")) {
+				l = new Launchpad(cache, uname, prHost, prCred);
+				Path z = Cache.fs.getPath(args.get(1));
+				final List<AZ> azs2 = new ArrayList<AZ>();
+				Consumer<String> ac = (x) -> {
+					String t[] = x.split("\\t");
+					int k = Integer.parseInt(t[0]);
+					char lang = t[1].charAt(0);
+					int m = Integer.parseInt(t[2]);
+					vedro.add(k);
+					azs2.add(new AZ(k, m, lang));
+				};
+				Files.lines(z).forEach(ac); 
+				while (vedro.size()>0) {
+					l.dlNotes(azs2, vedro, 10000000);
+				}
+				return;
+			}
+			// Offline commands: database and cache are required
+			db = new NotesDB(cache.notesdb, false, true, false);
+			db.initArea();
+			Area.reload();
 			try {
 				switch (cm) {
 //				case "LPAD.SYNC":
@@ -213,7 +237,7 @@ public class NotesRetriever {
 				case "SWDC.TEST":
 					System.out.println("Online support.sap.com/swdc for " + uname);
 					WebClient wc = null;
-					int i = 10;
+					i = 10;
 					while (i-->0 && wc==null) {
 						try {
 							wc = Launchpad.getLaunchpad(uname, prHost, prCred);
@@ -287,37 +311,56 @@ public class NotesRetriever {
 					}
 					break;
 				case "Report":
+//					assert Area.areaToCode.get("SBO")!=null : Area.areaToCode;
 					l = new Launchpad(cache);
-					l.areaList(db);
-					db.stat1(l.dbas, true);
-					break;
-				case "Report2":
-					l = new Launchpad(cache);
-					l.areaList(db);
-					List<Integer> x = db.stat1(l.dbas, false);
-					for (int j: x) {
-						System.out.println(j);
+					db.stat1upd(l.getFS());
+					//&& x.num>1600000 
+					azs = db.stat1get((x)->x.dled==0 && !Area.codeToArea.get(x.area).startsWith("SBO"));
+//					azs.sort(Comparator.comparing(z1->z1.num));
+					i = 1;
+					bw = Files.newBufferedWriter(FileSystems.getDefault().getPath(String.format("task%d", i)) );
+					j = 10000;
+					for (AZ az: azs) {
+						bw.write(String.format("%d\t%s\t%d\t%s%n", az.num, az.lang, az.mark, Area.codeToArea.get(az.area)));
+						if (--j==0) {
+							bw.close();
+							i++;
+							bw = Files.newBufferedWriter(FileSystems.getDefault().getPath(String.format("task%d", i)) );
+							j = 10000;
+						}
 					}
+					bw.close();
+//					l.checkFS(azs, vedro);
+//					db.stat1(l.dbas, true);
 					break;
-				case "Z1":
+				case "Z1": case "Z2": case "Z3": case "Z4": case "Z5":
 					l = new Launchpad(cache, uname, prHost, prCred);
 					l.areaList(db);
-					vedro = db.stat1(l.dbas, false);
-					System.out.println(vedro.size());
-					List<AZ> azs = db.getNotesCDB_byNums(vedro, false);
-					Iterator<AZ> ita = azs.iterator();
-					while (ita.hasNext()) {
-						AZ az = ita.next();
-						if (az.area.startsWith("SBO")) ita.remove();
-					}
-					System.out.println(azs.size());
-					while ( l.dlNotes(azs, vedro, null) ) {}
+//					Predicate<AZ> zbc = (x) -> !x.area.startsWith("SBO") && x.num>2000000;
+//					vedro = db.stat1(l.dbas, true, zbc);
+//					System.out.println(vedro.size());
+					azs = db.getNotesCDB_byNums(vedro);
+					db.close();
+					db = null;
+//					if ("Z2".equals(cm))
+//						
+//					else if ("Z3".equals(cm))
+//						azs.sort(Comparator.comparing(z1->-z1.num));
+//					else if ("Z4".equals(cm))
+//						azs.sort(Comparator.comparing(z1->z1.area));
+//					else if ("Z5".equals(cm))
+//						azs.sort(Comparator.comparing(z1->z1.area.length() ));
+//					while (vedro.size()>0) {
+//						l.checkFS(azs, vedro);
+//						l.dlNotes(azs, vedro);
+//					}
+//					for (AZ az: azs) System.out.println(String.format("%d %s", az.num, az.area));
+//					
 					break;
 //				case "Z2":
 //					l = new Launchpad(cache, uname, prHost, prCred);
 //					l.areaList(db);
 //					vedro = db.stat1(l.dbas, false);
-//					Comparator<Integer> cmp = Comparator.comparing(o1 -> o1);
 //					while ( l.dlNotes(db, vedro, 100, cmp) ) {}
 //					break;
 				case "":
